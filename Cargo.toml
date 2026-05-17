@@ -102,7 +102,7 @@ idna = "1.0"
 percent-encoding = "2.3"
 
 # Concurrency data structures
-foldhash = "0.1"
+foldhash = "0.2"
 arc-swap = "1.7"
 dashmap = "6.1"
 
