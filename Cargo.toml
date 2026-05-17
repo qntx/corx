@@ -128,7 +128,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
     "registry",
 ] }
 metrics = "0.24"
-metrics-exporter-prometheus = { version = "0.16", default-features = false, features = [
+metrics-exporter-prometheus = { version = "0.18", default-features = false, features = [
     "http-listener",
 ] }
 opentelemetry = { version = "0.27", default-features = false, features = [
