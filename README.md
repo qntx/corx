@@ -17,34 +17,51 @@
 [rust-badge]: https://img.shields.io/badge/rust-edition%202024-orange.svg
 [rust-url]: https://doc.rust-lang.org/edition-guide/
 
-**High-performance CORS forwarding proxy in Rust — stream any HTTP(S) target through a single binary, synthesise browser CORS, fail-closed SSRF by construction.**
+**High-performance CORS forwarding proxy written in Rust — one binary streams any HTTP(S) target, synthesises browser CORS headers, SSRF-safe by construction.**
 
-`corx` sits between browsers and upstream APIs that omit CORS. Path-prefix URL semantics match the classic [cors-anywhere](https://github.com/Rob--W/cors-anywhere) pattern (`/https://api.example.com/...`), while the hot path is zero-copy streaming on hyper 1.x + axum 0.8 + tokio: request and response bodies are forwarded chunk-by-chunk, connections are pooled, outbound TLS and DNS are pure Rust, and every resolved address is vetted by an SSRF guard *before* the TCP connect.
+`corx` sits between browsers and upstream APIs that omit CORS. Path-prefix URL semantics match the classic [cors-anywhere](https://github.com/Rob--W/cors-anywhere) pattern (`/https://api.example.com/...`), while the hot path is zero-copy streaming on hyper 1.x + axum 0.8 + tokio: bodies are forwarded chunk-by-chunk, connections are pooled, outbound TLS and DNS are pure Rust, and every resolved address is vetted by an SSRF guard *before* the TCP connect.
 
-> **Embed** via the [`corx`](https://docs.rs/corx) umbrella crate (`corx-core` engine + `corx-server` binding). **Run** the CLI package `corx-cli` (binary name remains `corx`).
+> **See also** the umbrella crate [`corx`](https://docs.rs/corx) for embedding (`corx-core` engine + `corx-server` binding). The CLI package is `corx-cli` (binary name `corx`).
 
 ## Quick Start
 
 ### Install the CLI
 
-Via Cargo:
+**Shell** (macOS / Linux):
+
+```bash
+curl -fsSL https://sh.qntx.fun/corx | sh
+```
+
+**PowerShell** (Windows):
+
+```powershell
+irm https://sh.qntx.fun/corx/ps | iex
+```
+
+Or via Cargo:
 
 ```bash
 cargo install corx-cli
-# or from a checkout:
-cargo install --path crates/corx-cli
 ```
 
 Optional features: `--features tls`, `mtls`, `otel`, or `full`.
 
-### Run
+### CLI Usage
 
 ```bash
-# From this repo
-cargo run --release -p corx-cli -- serve --config corx.example.toml
-
-# Or after install (defaults + env / config file)
+# Serve (default config discovery + env overrides)
 corx serve --config corx.example.toml
+
+# Validate config
+corx check --config corx.example.toml
+
+# Dump resolved config
+corx dump --format toml
+corx dump --format json
+
+# Build identity
+corx version
 ```
 
 Proxy a request (path-prefix target URL):
@@ -53,6 +70,21 @@ Proxy a request (path-prefix target URL):
 curl -H 'Origin: http://localhost' \
      'http://localhost:8080/https://api.github.com/repos/qntx/corx'
 ```
+
+From a git checkout without installing:
+
+```bash
+cargo run --release -p corx-cli -- serve --config corx.example.toml
+```
+
+Config sources, increasing precedence:
+
+1. Built-in defaults  
+2. `$CORX_CONFIG`, or `./corx.toml`, or `/etc/corx/config.toml`  
+3. Environment variables `CORX_*` (nested keys use `__`, e.g. `CORX_SERVER__BIND=0.0.0.0:9000`)  
+4. CLI `--config`
+
+Full knob reference: [`corx.example.toml`](corx.example.toml) · [Configuration](docs/configuration.md).
 
 ### Container
 
@@ -66,30 +98,12 @@ docker compose up -d
 
 Multi-arch GHCR images are published **on version tags** only (`v*`); see [Deployment](docs/deployment.md).
 
-### CLI Usage
-
-```bash
-corx serve              # default; bind and proxy
-corx check              # validate config, exit non-zero on failure
-corx dump               # print resolved config (--format toml|json)
-corx version            # version + os/arch + active features
-```
-
-Config sources, increasing precedence:
-
-1. Built-in defaults  
-2. `$CORX_CONFIG`, or `./corx.toml`, or `/etc/corx/config.toml`  
-3. Environment variables `CORX_*` (nested keys use `__`, e.g. `CORX_SERVER__BIND=0.0.0.0:9000`)  
-4. CLI `--config`
-
-Full knob reference: [`corx.example.toml`](corx.example.toml) · [Configuration](docs/configuration.md).
-
 ### Library Usage
 
 ```toml
-# Umbrella facade (recommended for embedders)
+# Default is the HTTP stack only — enable TLS / OTEL explicitly when needed.
 corx = { version = "0.2", features = ["tls", "otel"] }
-# Narrower graphs: corx-core (engine only) or corx-server (axum binding)
+# Optional: `full` (= tls + mtls + otel); or depend on corx-core / corx-server alone
 ```
 
 ```rust
