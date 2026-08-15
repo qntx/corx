@@ -180,7 +180,7 @@ anyhow = "1.0.104"
 
 # Dev only
 wiremock = "0.6.5"
-criterion = { version = "0.5.1", default-features = false, features = [
+criterion = { version = "0.8.2", default-features = false, features = [
     "async_tokio",
     "html_reports",
 ] }
