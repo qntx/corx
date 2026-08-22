@@ -142,7 +142,7 @@ metrics-exporter-prometheus = { version = "0.18", default-features = false, feat
     "http-listener",
 ] }
 # OTel crate set is upgraded together (API surface is tightly coupled).
-opentelemetry = { version = "0.30", default-features = false, features = [
+opentelemetry = { version = "0.32", default-features = false, features = [
     "trace",
 ] }
 opentelemetry_sdk = { version = "0.30", default-features = false, features = [
