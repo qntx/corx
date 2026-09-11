@@ -10,7 +10,7 @@ authors.workspace = true
 keywords.workspace = true
 categories.workspace = true
 description = "CLI for the corx high-performance CORS forwarding proxy"
-readme = "../../README.md"
+readme = "README.md"
 
 [[bin]]
 name = "corx"

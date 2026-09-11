@@ -10,7 +10,7 @@ authors.workspace = true
 keywords.workspace = true
 categories.workspace = true
 description = "axum/tower bindings for the corx CORS proxy engine"
-readme = "../../README.md"
+readme = "README.md"
 
 [lib]
 name = "corx_server"

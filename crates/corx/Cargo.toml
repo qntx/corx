@@ -10,7 +10,7 @@ authors.workspace = true
 keywords.workspace = true
 categories.workspace = true
 description = "High-performance CORS forwarding proxy — library facade"
-readme = "../../README.md"
+readme = "README.md"
 
 [lib]
 name = "corx"
