@@ -10,7 +10,7 @@ authors.workspace = true
 keywords.workspace = true
 categories.workspace = true
 description = "Framework-agnostic CORS forwarding proxy engine (used by corx)"
-readme = "../../README.md"
+readme = "README.md"
 
 [lib]
 name = "corx_core"
