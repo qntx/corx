@@ -146,9 +146,9 @@ binary CLI surface.
 - Default `cors.policy.kind` flipped from `wildcard` to `reflect` to
   match the production-safe default.
 - Workspace name surface -- imports change from `corx::*` to
-  `corx_core::*` / `corx_server::*` (see [docs/migration.md]).
+  `corx_core::*` / `corx_server::*` (see [notes/migration.md]).
 
-[docs/migration.md]: docs/migration.md
+[notes/migration.md]: notes/migration.md
 
 ## [0.1.0] -- MVP
 

@@ -4,7 +4,7 @@
 
 CORS forwarding proxy in Rust.
 
-See [docs/](docs/).
+See [notes/](notes/).
 
 ## License
 
