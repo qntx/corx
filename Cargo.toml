@@ -15,7 +15,7 @@ rust-version = "1.94"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/qntx/corx"
 homepage = "https://github.com/qntx/corx"
-authors = ["QNTX <https://qntx.fun>"]
+authors = ["QNTX <https://qntx.org>"]
 keywords = ["cors", "proxy"]
 categories = ["network-programming"]
 
