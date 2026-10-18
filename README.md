@@ -2,54 +2,22 @@
 
 # corx
 
-Link-preview service: one pure Rust core plus two thin runtimes — a native
-binary and a Cloudflare Worker. Give it a URL, get back the Open Graph /
-Twitter Card / standard metadata needed to render a link card.
+Link-preview service in Rust, for bare-metal servers and Cloudflare Workers. Give it a URL, get the Open Graph / Twitter Card metadata needed to render a link card.
 
-## Layout
-
-```text
-crates/corx          pure core (no I/O; compiles native + wasm32)
-crates/corx-server   native binary (`corx`)
-crates/corx-worker   Cloudflare Worker (workers-rs, wasm32)
-```
-
-The core owns the whole request pipeline (`corx::service`): routing, CORS,
-rate admission, caching, SSRF-safe fetching, HTML metadata extraction and
-response rendering. The adapters only supply platform primitives — fetch,
-timers, rate limiters and a cache — through `service::Runtime`, so both
-runtimes behave identically.
+- `corx` — sans-IO core: URL admission, SSRF rules, streaming metadata extraction and the shared request pipeline (`wasm32-unknown-unknown` clean)
+- `corx-server` — the `corx` binary (axum + reqwest)
+- `corx-worker` — the Cloudflare Worker (workers-rs)
 
 ## Quick start
 
-Native server:
-
 ```bash
-cargo run -p corx-server -- --allowed-origins https://app.example.com
+cargo run --release -p corx-server -- --allowed-origins https://app.example.com
 curl 'http://localhost:8080/v1/preview?url=https%3A%2F%2Fexample.com'
 ```
 
-Docker: `docker build -t corx . && docker run -e CORX_ALLOWED_ORIGINS='*' -p 8080:8080 corx`
+`corx --help` lists every flag with its `CORX_*` environment variable. The Worker is configured in `crates/corx-worker/wrangler.jsonc` and deployed with wrangler (`ALLOWED_ORIGINS` must be set).
 
-Cloudflare Worker:
-
-```bash
-just worker-dev      # local dev server (wrangler 4.149.0, pinned)
-just worker-deploy   # deploy; set ALLOWED_ORIGINS via --var or wrangler.jsonc
-```
-
-## Docs
-
-- [API](docs/api.mdx) — endpoint, JSON contract, error slugs, caching and CORS
-- [Security](docs/security.mdx) — SSRF model, resource limits, privacy
-- [Deployment](docs/deployment.mdx) — configuration, Docker, Worker, metrics
-
-## Development
-
-```bash
-just fmt clippy test   # fmt + strict clippy + tests
-just clippy-wasm       # wasm32 clippy for core + worker
-```
+Changes are tracked in [CHANGELOG.md](CHANGELOG.md); contributor invariants and the local gate live in [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

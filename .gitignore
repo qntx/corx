@@ -29,3 +29,6 @@ crates/.DS_Store
 build/
 node_modules/
 .wrangler/
+
+# Local-only design docs; never pushed.
+/docs/

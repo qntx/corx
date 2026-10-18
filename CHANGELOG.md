@@ -22,6 +22,8 @@ the HTTP contract of the preview endpoint.
   timed preview fetch and rendering — lives in `corx::service`; both
   adapters only implement the `service::Runtime` trait, so behaviour is
   identical across runtimes.
+- Public docs removed in favour of `CONTRIBUTING.md`; `docs/` is local-only.
+- TOML is formatted by taplo (`.taplo.toml`).
 - All previous configuration (TOML file, CLI subcommands) replaced by a
   small set of `CORX_*` env vars / flags.
 - Helm chart, Compose files and the old proxy code have been removed.
