@@ -79,17 +79,6 @@ fn resolve(raw: &str, base: &Url) -> Option<String> {
     }
 }
 
-fn charset(content_type: Option<&str>) -> Option<&str> {
-    content_type.and_then(|ct| {
-        ct.split(';').skip(1).find_map(|param| {
-            let (name, value) = param.split_once('=')?;
-            name.trim()
-                .eq_ignore_ascii_case("charset")
-                .then(|| value.trim().trim_matches('"'))
-        })
-    })
-}
-
 fn is_redirect(status: ::http::StatusCode) -> bool {
     matches!(
         status,
@@ -146,17 +135,16 @@ pub async fn preview<F: Fetch>(
             .get(::http::header::CONTENT_TYPE)
             .and_then(|v| v.to_str().ok())
             .map(str::to_owned);
-        let Some(essence) = content_type
+        let mime = content_type
             .as_deref()
-            .and_then(|ct| ct.split(';').next())
-            .map(|e| e.trim().to_ascii_lowercase())
-        else {
+            .and_then(|ct| ct.parse::<mime::Mime>().ok());
+        let Some(mime) = mime else {
             return Err(Error::NotHtml);
         };
-        if essence != "text/html" && essence != "application/xhtml+xml" {
+        if mime.essence_str() != "text/html" && mime.essence_str() != "application/xhtml+xml" {
             return Err(Error::NotHtml);
         }
-        let cs = charset(content_type.as_deref()).map(str::to_owned);
+        let cs = mime.get_param(mime::CHARSET).map(|c| c.as_str().to_owned());
         let md = drain(response.into_body(), cs.as_deref()).await?;
         return build(&original, &current, md, now_unix_secs);
     }
@@ -187,6 +175,22 @@ where
     Ok(extractor.finish())
 }
 
+const IMAGE_KEYS: [&str; 5] = [
+    "og:image:secure_url",
+    "og:image:url",
+    "og:image",
+    "twitter:image",
+    "twitter:image:src",
+];
+
+/// `og:image:{width,height}` as a positive dimension; zero and malformed
+/// values are dropped.
+fn dim(md: &Metadata, key: &str) -> Option<u32> {
+    meta(md, &[key])
+        .and_then(|v| v.parse::<u32>().ok())
+        .filter(|&n| n > 0)
+}
+
 fn build(original: &str, current: &Target, md: Metadata, now: u64) -> Result<Preview, Error> {
     let base = md
         .base
@@ -204,23 +208,24 @@ fn build(original: &str, current: &Target, md: Metadata, now: u64) -> Result<Pre
     )
     .map(str::to_owned);
     let site_name = meta(&md, &["og:site_name"]).map(str::to_owned);
-    let image = meta(
-        &md,
-        &[
-            "og:image:secure_url",
-            "og:image:url",
-            "og:image",
-            "twitter:image",
-            "twitter:image:src",
-        ],
-    )
-    .and_then(|raw| resolve(raw, &base))
-    .map(|url| Image {
-        url,
-        width: meta(&md, &["og:image:width"]).and_then(|v| v.parse().ok()),
-        height: meta(&md, &["og:image:height"]).and_then(|v| v.parse().ok()),
-        alt: meta(&md, &["og:image:alt", "twitter:image:alt"]).map(str::to_owned),
-    });
+    let image = IMAGE_KEYS
+        .iter()
+        .find_map(|k| {
+            md.meta
+                .get(*k)
+                .and_then(|raw| resolve(raw, &base))
+                .map(|url| (*k, url))
+        })
+        .map(|(key, url)| {
+            // og:image:width/height describe the og:image* URL only.
+            let og = key.starts_with("og:image");
+            Image {
+                url,
+                width: og.then(|| dim(&md, "og:image:width")).flatten(),
+                height: og.then(|| dim(&md, "og:image:height")).flatten(),
+                alt: meta(&md, &["og:image:alt", "twitter:image:alt"]).map(str::to_owned),
+            }
+        });
     let favicon = md
         .icon
         .as_deref()
@@ -256,7 +261,6 @@ fn build(original: &str, current: &Target, md: Metadata, now: u64) -> Result<Pre
 mod tests {
     use std::collections::HashMap;
     use std::pin::Pin;
-    use std::task::{Context, Poll};
 
     use bytes::Bytes;
     use futures_core::Stream;
@@ -264,22 +268,12 @@ mod tests {
     use http::{HeaderValue, StatusCode, header::CONTENT_TYPE, header::LOCATION};
     use url::Url;
 
-    use super::{Image, preview};
+    use super::{Image, Preview, preview};
     use crate::{Error, Fetch, FetchError, MAX_HTML_BYTES, Target};
 
     type Body = Pin<Box<dyn Stream<Item = Result<Bytes, FetchError>> + Send>>;
 
-    fn block_on<F: Future>(fut: F) -> F::Output {
-        let waker = futures_util::task::noop_waker();
-        let mut cx = Context::from_waker(&waker);
-        let mut fut = std::pin::pin!(fut);
-        loop {
-            match fut.as_mut().poll(&mut cx) {
-                Poll::Ready(v) => return v,
-                Poll::Pending => std::thread::yield_now(),
-            }
-        }
-    }
+    use futures_executor::block_on;
 
     struct Fake {
         routes: HashMap<String, Result<http::Response<Vec<Bytes>>, FetchError>>,
@@ -447,6 +441,105 @@ mod tests {
             block_on(preview(&fake, target("https://a.com"), 0)),
             Err(Error::BlockedTarget)
         );
+    }
+
+    #[test]
+    fn exactly_five_redirects_succeed() {
+        let mut fake = Fake::new();
+        fake.respond("https://a.com/", redirect_to("https://b.com/1"));
+        fake.respond("https://b.com/1", redirect_to("https://b.com/2"));
+        fake.respond("https://b.com/2", redirect_to("https://b.com/3"));
+        fake.respond("https://b.com/3", redirect_to("https://b.com/4"));
+        fake.respond("https://b.com/4", redirect_to("https://b.com/final"));
+        fake.respond("https://b.com/final", html(OG));
+        let p = block_on(preview(&fake, target("https://a.com"), 9)).expect("preview");
+        assert_eq!(p.final_url, "https://b.com/final");
+    }
+
+    #[test]
+    fn json_contract() {
+        let full = Preview {
+            url: "https://a.com".into(),
+            final_url: "https://a.com/".into(),
+            title: Some("T".into()),
+            description: Some("D".into()),
+            site_name: Some("S".into()),
+            image: Some(Image {
+                url: "https://a.com/i.png".into(),
+                width: Some(1200),
+                height: Some(630),
+                alt: Some("A".into()),
+            }),
+            favicon: Some("https://a.com/f.ico".into()),
+            card: Some("summary_large_image".into()),
+            kind: Some("article".into()),
+            theme_color: Some("#fff".into()),
+            lang: Some("en".into()),
+            fetched_at: 7,
+        };
+        assert_eq!(
+            serde_json::to_string(&full).expect("ser"),
+            r##"{"url":"https://a.com","finalUrl":"https://a.com/","title":"T","description":"D","siteName":"S","image":{"url":"https://a.com/i.png","width":1200,"height":630,"alt":"A"},"favicon":"https://a.com/f.ico","card":"summary_large_image","type":"article","themeColor":"#fff","lang":"en","fetchedAt":7}"##
+        );
+        let minimal = Preview {
+            url: "https://a.com".into(),
+            final_url: "https://a.com/".into(),
+            title: Some("T".into()),
+            description: None,
+            site_name: None,
+            image: None,
+            favicon: None,
+            card: None,
+            kind: None,
+            theme_color: None,
+            lang: None,
+            fetched_at: 7,
+        };
+        assert_eq!(
+            serde_json::to_string(&minimal).expect("ser"),
+            r#"{"url":"https://a.com","finalUrl":"https://a.com/","title":"T","fetchedAt":7}"#
+        );
+    }
+
+    #[test]
+    fn twitter_image_ignores_og_dimensions() {
+        let mut fake = Fake::new();
+        fake.respond(
+            "https://a.com/",
+            html(r#"<html><head><meta name="twitter:image" content="t.png"><meta property="og:image:width" content="600"><meta property="og:title" content="x"></head><body/></html>"#),
+        );
+        let p = block_on(preview(&fake, target("https://a.com"), 0)).expect("preview");
+        let img = p.image.expect("image");
+        assert_eq!(img.url, "https://a.com/t.png");
+        assert_eq!(img.width, None);
+        assert_eq!(img.height, None);
+    }
+
+    #[test]
+    fn unresolvable_image_falls_through_to_next_key() {
+        let mut fake = Fake::new();
+        fake.respond(
+            "https://a.com/",
+            html(r#"<html><head><meta property="og:title" content="x"><meta property="og:image" content="data:image/png;base64,xx"><meta property="og:image:width" content="600"><meta name="twitter:image" content="/t.png"></head><body/></html>"#),
+        );
+        let p = block_on(preview(&fake, target("https://a.com"), 0)).expect("preview");
+        let img = p.image.expect("image");
+        assert_eq!(img.url, "https://a.com/t.png");
+        assert_eq!(img.width, None);
+        assert_eq!(img.height, None);
+    }
+
+    #[test]
+    fn zero_and_malformed_image_dimensions_dropped() {
+        let mut fake = Fake::new();
+        fake.respond(
+            "https://a.com/",
+            html(r#"<html><head><meta property="og:title" content="x"><meta property="og:image" content="i.png"><meta property="og:image:width" content="0"><meta property="og:image:height" content="big"></head><body/></html>"#),
+        );
+        let p = block_on(preview(&fake, target("https://a.com"), 0)).expect("preview");
+        let img = p.image.expect("image");
+        assert_eq!(img.width, None);
+        assert_eq!(img.height, None);
     }
 
     #[test]

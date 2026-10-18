@@ -18,6 +18,10 @@ the HTTP contract of the preview endpoint.
 - One pure core crate `crates/corx` (no I/O, compiles on native and
   `wasm32-unknown-unknown`) with two thin adapters: `corx-server` (native
   Axum binary) and `corx-worker` (Cloudflare Worker via workers-rs).
+- The full request pipeline — routing, CORS, rate admission, shared cache,
+  timed preview fetch and rendering — lives in `corx::service`; both
+  adapters only implement the `service::Runtime` trait, so behaviour is
+  identical across runtimes.
 - All previous configuration (TOML file, CLI subcommands) replaced by a
   small set of `CORX_*` env vars / flags.
 - Helm chart, Compose files and the old proxy code have been removed.

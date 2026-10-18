@@ -36,8 +36,16 @@ Every flag maps to a `CORX_*` environment variable.
 | `RUST_LOG`                                             | `info`                                                                  |
 
 Metrics are exported on `--metrics-bind` only, never on the public port:
-`corx_requests_total{outcome}`, `corx_cache_total{result}` and
-`corx_upstream_duration_seconds` (misses only).
+`corx_requests_total{outcome}` and
+`corx_request_duration_seconds{cache="hit"|"miss"|"none"}`.
+
+### Fronting proxy
+
+The binary serves plain HTTP only. Run it behind a TLS-terminating reverse
+proxy or CDN — that layer also provides slow-client and header-read timeout
+protection, which `axum::serve` does not implement on its own. `/healthz`
+is served outside the concurrency limiter so liveness probes still succeed
+under saturation.
 
 ## Cloudflare Worker
 
@@ -59,11 +67,12 @@ Configuration lives in `crates/corx-worker/wrangler.jsonc`:
 npx wrangler@4.149.0 deploy --var ALLOWED_ORIGINS:https://app.example.com
 ```
 
-The Cache API only works on a custom domain/route — it is a no-op on
-`*.workers.dev` and in `wrangler dev`, where every request is a miss.
+The Cache API works in `wrangler dev` and on custom domains/routes, but it
+is a no-op on `*.workers.dev` hostnames — deploy on a route to use it.
 
-Responses are cached in the Cache API under a synthetic
-`https://corx.cache/...` key containing the normalized target — successes
-for 24 h, `no_metadata`/`upstream_status` for 1 h, everything else not at
-all. CORS is applied after cache reads so stored entries never carry
-`Access-Control-Allow-Origin`.
+Responses are cached in the Cache API under the Worker's own request
+origin — `{origin}/v1/preview?url=<encoded target>` — successes for 24 h,
+`no_metadata`/`upstream_status` for 1 h, everything else not at all. CORS
+is applied after cache reads so stored entries never carry
+`Access-Control-Allow-Origin`. Rate-limit denials report
+`Retry-After: 60` (the binding period).

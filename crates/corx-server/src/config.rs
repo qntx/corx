@@ -48,11 +48,11 @@ pub(crate) struct Config {
     pub(crate) host_rate_per_minute: u32,
 
     /// Maximum concurrently served requests; excess is shed with 503.
-    #[arg(long, env = "CORX_MAX_CONCURRENCY", default_value_t = 512)]
+    #[arg(long, env = "CORX_MAX_CONCURRENCY", default_value_t = 512, value_parser = clap::builder::RangedU64ValueParser::<usize>::new().range(1..))]
     pub(crate) max_concurrency: usize,
 
     /// Maximum preview cache entries.
-    #[arg(long, env = "CORX_CACHE_CAPACITY", default_value_t = 100_000)]
+    #[arg(long, env = "CORX_CACHE_CAPACITY", default_value_t = 100_000, value_parser = clap::value_parser!(u64).range(1..))]
     pub(crate) cache_capacity: u64,
 
     /// Optional dedicated listen address for the Prometheus metrics exporter.

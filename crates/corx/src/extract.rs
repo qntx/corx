@@ -104,10 +104,27 @@ fn is_done(state: &Mutex<Inner>) -> bool {
 
 /// Decodes HTML entities, collapses whitespace, trims; empty → `None`,
 /// longer than `max_chars` → truncated on a char boundary.
-fn clean(raw: &str, max_chars: usize) -> Option<String> {
+fn clean_text(raw: &str, max_chars: usize) -> Option<String> {
     let decoded = html_escape::decode_html_entities(raw);
     let collapsed = decoded.split_whitespace().collect::<Vec<_>>().join(" ");
     (!collapsed.is_empty()).then(|| collapsed.chars().take(max_chars).collect())
+}
+
+/// Decodes HTML entities and trims; empty or longer than `MAX_URL_LEN` bytes
+/// → `None`. URLs are never truncated: a cut-off URL would still parse but
+/// point somewhere wrong.
+fn clean_url(raw: &str) -> Option<String> {
+    let decoded = html_escape::decode_html_entities(raw);
+    let trimmed = decoded.trim();
+    (!trimmed.is_empty() && trimmed.len() <= MAX_URL_LEN).then(|| (*trimmed).to_owned())
+}
+
+/// URL-valued `meta` keys; everything else is text.
+fn is_url_key(key: &str) -> bool {
+    matches!(
+        key,
+        "og:image" | "og:image:url" | "og:image:secure_url" | "twitter:image" | "twitter:image:src"
+    )
 }
 
 fn max_chars_for(key: &str) -> usize {
@@ -117,7 +134,16 @@ fn max_chars_for(key: &str) -> usize {
         "og:image:alt" | "twitter:image:alt" => MAX_ALT_CHARS,
         "og:type" | "twitter:card" => MAX_KIND_CHARS,
         "theme-color" => MAX_THEME_COLOR_CHARS,
-        _ => MAX_URL_LEN,
+        // og:title, twitter:title and any remaining text keys.
+        _ => MAX_TITLE_CHARS,
+    }
+}
+
+fn clean_meta(key: &str, content: &str) -> Option<String> {
+    if is_url_key(key) {
+        clean_url(content)
+    } else {
+        clean_text(content, max_chars_for(key))
     }
 }
 
@@ -142,7 +168,7 @@ fn on_meta(state: &Arc<Mutex<Inner>>) -> Handler {
         let Some(content) = el.get_attribute("content") else {
             return Ok(());
         };
-        if let Some(value) = clean(&content, max_chars_for(&key)) {
+        if let Some(value) = clean_meta(&key, &content) {
             lock(&st).meta.entry(key).or_insert(value);
         }
         Ok(())
@@ -165,7 +191,7 @@ fn on_title(state: &Arc<Mutex<Inner>>) -> Handler {
             let mut g = lock(&st2);
             g.collecting_title = false;
             let raw = std::mem::take(&mut g.title_buf);
-            g.title = clean(&raw, MAX_TITLE_CHARS);
+            g.title = clean_text(&raw, MAX_TITLE_CHARS);
             drop(g);
             Ok(())
         }))
@@ -206,7 +232,7 @@ fn on_link(state: &Arc<Mutex<Inner>>) -> Handler {
         let Some(href) = el.get_attribute("href") else {
             return Ok(());
         };
-        let Some(href) = clean(&href, MAX_URL_LEN) else {
+        let Some(href) = clean_url(&href) else {
             return Ok(());
         };
         let mut g = lock(&st);
@@ -231,7 +257,7 @@ fn on_html(state: &Arc<Mutex<Inner>>) -> Handler {
         if let Some(lang) = el.get_attribute("lang") {
             let mut g = lock(&st);
             if g.lang.is_none() {
-                g.lang = clean(&lang, MAX_LANG_CHARS);
+                g.lang = clean_text(&lang, MAX_LANG_CHARS);
             }
         }
         Ok(())
@@ -247,7 +273,7 @@ fn on_base(state: &Arc<Mutex<Inner>>) -> Handler {
         if let Some(href) = el.get_attribute("href") {
             let mut g = lock(&st);
             if g.base.is_none() {
-                g.base = clean(&href, MAX_URL_LEN);
+                g.base = clean_url(&href);
             }
         }
         Ok(())
@@ -419,6 +445,22 @@ mod tests {
         let doc = r#"<head><link rel="Shortcut Icon" href="/s.ico"><link rel="ICON" href="/i.ico"></head>"#;
         let md = run(&[doc.as_bytes()], None);
         assert_eq!(md.icon.as_deref(), Some("/s.ico"));
+    }
+
+    #[test]
+    fn titles_cap_at_max_but_urls_never_truncate() {
+        let long_title = "x".repeat(400);
+        let long_url = format!("https://a.com/{}", "p".repeat(3000));
+        let doc = format!(
+            r#"<head><meta property="og:title" content="{long_title}"><meta property="og:image" content="{long_url}"><link rel="icon" href="{long_url}"></head>"#
+        );
+        let md = run(&[doc.as_bytes()], None);
+        assert_eq!(meta(&md, "og:title").map(str::len), Some(300));
+        assert!(
+            !md.meta.contains_key("og:image"),
+            "oversized URL must be dropped"
+        );
+        assert!(md.icon.is_none(), "oversized icon href must be dropped");
     }
 
     #[test]

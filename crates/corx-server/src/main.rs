@@ -3,6 +3,7 @@
 mod app;
 mod config;
 mod fetch;
+mod runtime;
 
 use std::process::ExitCode;
 
@@ -76,14 +77,7 @@ fn build_app(cfg: &Config) -> Option<Router> {
             return None;
         }
     };
-    let limits = Limits {
-        ip_rate_per_minute: cfg.ip_rate_per_minute,
-        ip_burst: cfg.ip_burst,
-        host_rate_per_minute: cfg.host_rate_per_minute,
-        max_concurrency: cfg.max_concurrency,
-        cache_capacity: cfg.cache_capacity,
-        client_ip_source: cfg.client_ip_source.clone(),
-    };
+    let limits = Limits::from(cfg);
     Some(router(origins, fetch, &limits))
 }
 

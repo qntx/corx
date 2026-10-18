@@ -11,6 +11,7 @@ pub mod http;
 pub mod ip;
 mod maybe_send;
 mod preview;
+pub mod service;
 mod target;
 
 pub use error::Error;

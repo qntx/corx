@@ -9,46 +9,33 @@ use ::http::StatusCode;
     clippy::error_impl_error,
     reason = "the crate's single public error type; the name is the API"
 )]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     /// The `url` parameter was missing, malformed, or violates a syntax rule.
-    #[error("invalid or unsupported URL")]
     InvalidUrl,
     /// The request `Origin` is not on the allowlist.
-    #[error("origin is not allowed")]
     ForbiddenOrigin,
     /// The target (or a redirect hop) resolves to a disallowed host.
-    #[error("target host is not allowed")]
     BlockedTarget,
     /// No route matched the request path.
-    #[error("not found")]
     NotFound,
     /// The page carried no usable link metadata.
-    #[error("no link metadata found")]
     NoMetadata,
     /// The method is not supported by this service.
-    #[error("method not allowed")]
     MethodNotAllowed,
     /// The upstream body exceeded `MAX_HTML_BYTES` before `</head>`.
-    #[error("response exceeded the size limit")]
     TooLarge,
     /// The upstream response was not HTML.
-    #[error("response is not HTML")]
     NotHtml,
     /// The upstream returned a non-2xx status or a malformed redirect.
-    #[error("upstream returned an unexpected status")]
     UpstreamStatus,
     /// The caller exceeded a rate limit.
-    #[error("rate limit exceeded")]
     RateLimited,
     /// The target could not be reached.
-    #[error("could not reach the target")]
     UpstreamUnreachable,
     /// The service is shedding load.
-    #[error("server is overloaded")]
     Overloaded,
     /// The upstream exchange exceeded its time budget.
-    #[error("upstream timed out")]
     UpstreamTimeout,
 }
 
@@ -127,6 +114,14 @@ impl Error {
         matches!(self, Self::NoMetadata | Self::UpstreamStatus)
     }
 }
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.message())
+    }
+}
+
+impl core::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {

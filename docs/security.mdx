@@ -38,9 +38,10 @@ as public internet traffic and blocks same-zone origin bypass.
 
 - 1 MiB response cap, 4 s total budget (all hops), 3 s connect timeout.
 - Per-client-IP: 60 requests/minute sustained, 120 burst (429 +
-  `Retry-After`). Clients whose IP cannot be extracted share one bucket —
-  they are limited together, never exempted.
-- Per-target-host: 120 requests/minute (429).
+  `Retry-After`; the Worker binding reports a fixed 60 s). Clients whose
+  IP cannot be extracted share one bucket — they are limited together,
+  never exempted.
+- Per-target-host: 120 requests/minute (429 + `Retry-After`).
 - Upstream pages larger than 1 MiB are rejected with 413.
 - Concurrency is capped (default 512); excess load is shed with 503.
 

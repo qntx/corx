@@ -29,6 +29,7 @@ futures-util = { version = "0.3.34", default-features = false, features = ["std"
 
 # HTML metadata extraction
 lol_html = "3.0.1"
+mime = "0.3.17"
 encoding_rs = "0.8.42"
 html-escape = "0.2.15"
 sha2 = "0.11.0"
@@ -45,9 +46,8 @@ tokio = { version = "1.53.2", features = [
   "net",
   "signal",
   "time",
-  "sync",
 ] }
-axum = { version = "0.8.9", features = ["http1", "tokio", "query", "json"] }
+axum = { version = "0.8.9", features = ["http1", "tokio"] }
 tower = { version = "0.5.3", features = ["limit", "load-shed", "util"] }
 reqwest = { version = "0.13.5", default-features = false, features = [
   "rustls",

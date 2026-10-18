@@ -67,6 +67,9 @@ Success is sent with
 | 504    | `upstream_timeout`     | `no-store`             | 4 s total budget exceeded        |
 
 `no_metadata` and `upstream_status` are the only cacheable failures.
+`429` responses carry `Retry-After` (seconds; the Worker binding reports a
+fixed `60`). Cache hits return the stored response — including the cached
+`Cache-Control` — and are recorded in logs/metrics as the `cached` outcome.
 
 ## CORS
 

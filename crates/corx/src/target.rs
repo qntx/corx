@@ -1,7 +1,5 @@
 //! Validated target URLs: the unit the preview pipeline operates on.
 
-use core::fmt::Write as _;
-
 use sha2::{Digest, Sha256};
 use url::{Host, Url};
 
@@ -93,11 +91,12 @@ impl Target {
     #[must_use]
     pub fn fingerprint(&self) -> String {
         let digest = Sha256::digest(self.as_str().as_bytes());
-        let mut out = String::with_capacity(12);
-        for byte in digest.iter().take(6) {
-            let _written = write!(out, "{byte:02x}");
-        }
-        out
+        digest
+            .iter()
+            .take(6)
+            .flat_map(|b| [b >> 4, b & 0x0f])
+            .map(|n| char::from_digit(u32::from(n), 16).unwrap_or('0'))
+            .collect()
     }
 }
 
