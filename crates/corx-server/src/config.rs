@@ -28,7 +28,7 @@ pub(crate) struct Config {
 
     /// `User-Agent` sent to upstream servers.
     #[arg(long, env = "CORX_USER_AGENT",
-        default_value = concat!("corx/", env!("CARGO_PKG_VERSION"), " (+https://github.com/qntx/corx)"))]
+        default_value = corx::DEFAULT_USER_AGENT)]
     pub(crate) user_agent: String,
 
     /// Source used to derive the client IP for rate limiting.

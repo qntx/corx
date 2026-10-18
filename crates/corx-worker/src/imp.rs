@@ -40,10 +40,9 @@ fn cfg(env: &Env) -> Result<Cfg, worker::Error> {
         .unwrap_or_default();
     let origins = Origins::parse(&raw)
         .map_err(|e| worker::Error::RustError(format!("ALLOWED_ORIGINS: {e}")))?;
-    let user_agent = env.var("USER_AGENT").map_or_else(
-        |_| concat!("corx/", env!("CARGO_PKG_VERSION")).to_owned(),
-        |v| v.to_string(),
-    );
+    let user_agent = env
+        .var("USER_AGENT")
+        .map_or_else(|_| corx::DEFAULT_USER_AGENT.to_owned(), |v| v.to_string());
     Ok(Cfg {
         origins,
         user_agent,

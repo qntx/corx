@@ -27,7 +27,7 @@
   "vars": {
     // Deployments MUST set this to a comma-separated Origin allowlist
     // (or "*" for fully public). Empty = no browser Origin is allowed.
-    "ALLOWED_ORIGINS": "",
-    "USER_AGENT": "corx/0.3.0 (+https://github.com/qntx/corx)"
+    // Optional USER_AGENT overrides the versioned corx default.
+    "ALLOWED_ORIGINS": ""
   }
 }

@@ -2,6 +2,7 @@
 name = "corx"
 description = "Link-preview core: URL validation, SSRF guard, streaming HTML metadata extraction."
 version.workspace = true
+readme = "../../README.md"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

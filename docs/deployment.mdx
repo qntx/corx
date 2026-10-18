@@ -61,7 +61,8 @@ Configuration lives in `crates/corx-worker/wrangler.jsonc`:
   (namespace `1002`), each 120 per 60 s.
 - `vars.ALLOWED_ORIGINS` — **must be set at deploy time** (empty means no
   browser Origin is allowed: API is then native-client-only);
-  `vars.USER_AGENT` for upstream requests.
+  optional `USER_AGENT` (for example `--var USER_AGENT:...`) overrides the
+  versioned default `corx/<version> (+https://github.com/qntx/corx)`.
 
 ```bash
 npx wrangler@4.149.0 deploy --var ALLOWED_ORIGINS:https://app.example.com

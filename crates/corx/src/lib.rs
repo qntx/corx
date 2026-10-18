@@ -35,6 +35,13 @@ pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 /// Wall-clock budget for the whole preview (all redirect hops).
 pub const TOTAL_TIMEOUT: Duration = Duration::from_secs(4);
 
+/// Default upstream `User-Agent`; deployments override it with their own.
+pub const DEFAULT_USER_AGENT: &str = concat!(
+    "corx/",
+    env!("CARGO_PKG_VERSION"),
+    " (+https://github.com/qntx/corx)"
+);
+
 /// `Accept` header sent upstream.
 pub const ACCEPT: &str = "text/html,application/xhtml+xml";
 

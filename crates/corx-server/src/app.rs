@@ -116,7 +116,7 @@ async fn preview<F: Fetch>(
         path = path.as_str(),
         outcome = record.outcome,
         status = record.status.as_u16(),
-        latency_ms = elapsed.as_millis(),
+        latency_ms = u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX),
         cache = cache,
         target_host = record.target_host.as_deref().unwrap_or("n/a"),
         target_fingerprint = record.target_fingerprint.as_deref().unwrap_or("n/a"),
