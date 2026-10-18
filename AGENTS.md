@@ -7,3 +7,21 @@
 - Prefer established, well-maintained libraries when they reduce overall complexity or improve reliability. Do not reimplement common functionality without a clear reason.
 - Lean on the dependencies already in the project before writing your own implementation or adding packages. Do not assume a library lacks a capability without checking its documentation and types.
 - Make architectural decisions for the long term. Do not accept a stopgap that only works for now and is meant to be replaced later.
+
+## Commands
+
+Local gate before a pull request:
+
+```bash
+npx --yes @taplo/cli@0.7.0 fmt --check
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo clippy -p corx -p corx-worker --target wasm32-unknown-unknown -- -D warnings
+cargo test --workspace --all-features
+RUSTDOCFLAGS="-D warnings" cargo doc -p corx --no-deps
+cargo deny check
+```
+
+`docs/` is local-only and gitignored; never commit it.
+
+TOML is formatted by taplo (`.taplo.toml`, aligned `=`); keep `taplo fmt --check` green.
