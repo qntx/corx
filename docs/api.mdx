@@ -1,0 +1,78 @@
+---
+title: API
+description: Request contract, JSON response fields and error semantics.
+---
+
+## Endpoint
+
+```text
+GET /v1/preview?url=<absolute http(s) URL>
+HEAD /v1/preview?url=<same>
+OPTIONS /v1/preview   (CORS preflight)
+GET /healthz          (returns 200 "ok")
+```
+
+Only GET, HEAD and OPTIONS are accepted; other methods return 405 with
+`Allow: GET, HEAD, OPTIONS`.
+
+## Success
+
+200 JSON body. Optional fields are omitted when absent.
+
+| Field         | Source                                                   |
+| ------------- | -------------------------------------------------------- |
+| `url`         | the requested URL, as validated                          |
+| `finalUrl`    | URL after redirects                                      |
+| `title`       | `og:title` → `twitter:title` → `<title>`                 |
+| `description` | `og:description` → `twitter:description` → `description` |
+| `siteName`    | `og:site_name`                                           |
+| `image`       | `og:image:secure_url` → `og:image` → `twitter:image`     |
+| `favicon`     | icon link (never synthesized)                            |
+| `card`        | `twitter:card`                                           |
+| `type`        | `og:type`                                                |
+| `themeColor`  | `theme-color` meta                                       |
+| `lang`        | `html[lang]`                                             |
+| `fetchedAt`   | Unix seconds of the fetch                                |
+
+```json
+{
+  "url": "https://example.com",
+  "finalUrl": "https://example.com/",
+  "title": "Example Domain",
+  "fetchedAt": 1760764800
+}
+```
+
+Success is sent with
+`Cache-Control: public, max-age=86400, stale-while-revalidate=604800`.
+
+## Errors
+
+`{"error": "<slug>", "message": "<short description>"}`
+
+| Status | Slug                   | Cache-Control          | Meaning                          |
+| ------ | ---------------------- | ---------------------- | -------------------------------- |
+| 400    | `invalid_url`          | `no-store`             | malformed or disallowed URL      |
+| 403    | `forbidden_origin`     | `no-store`             | Origin not on the allowlist      |
+| 403    | `blocked_target`       | `no-store`             | private/reserved target          |
+| 404    | `not_found`            | `no-store`             | unknown route                    |
+| 404    | `no_metadata`          | `public, max-age=3600` | page had no previewable metadata |
+| 405    | `method_not_allowed`   | `no-store`             | unsupported method               |
+| 413    | `too_large`            | `no-store`             | upstream page exceeded 1 MiB     |
+| 415    | `not_html`             | `no-store`             | upstream returned non-HTML       |
+| 422    | `upstream_status`      | `public, max-age=3600` | upstream returned an error       |
+| 429    | `rate_limited`         | `no-store`             | per-IP or per-host quota         |
+| 502    | `upstream_unreachable` | `no-store`             | connect/transfer failure         |
+| 503    | `overloaded`           | `no-store`             | concurrency shed                 |
+| 504    | `upstream_timeout`     | `no-store`             | 4 s total budget exceeded        |
+
+`no_metadata` and `upstream_status` are the only cacheable failures.
+
+## CORS
+
+Preflight (`OPTIONS`) validates the `Origin` and returns
+`Access-Control-Allow-Methods: GET, HEAD, OPTIONS` plus
+`Access-Control-Max-Age: 86400`. Actual responses echo the origin in
+`Access-Control-Allow-Origin` only when it is allowed, and always send
+`Vary: Origin` in list mode. CORS headers are applied after cache lookups
+so cached entries never carry origin state.

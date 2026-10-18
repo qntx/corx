@@ -1,5 +1,6 @@
 [package]
 name = "corx"
+description = "Link-preview core: URL validation, SSRF guard, streaming HTML metadata extraction."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,29 +10,20 @@ homepage.workspace = true
 authors.workspace = true
 keywords.workspace = true
 categories.workspace = true
-description = "High-performance CORS forwarding proxy — library facade"
-readme = "README.md"
-
-[lib]
-name = "corx"
-path = "src/lib.rs"
-
-[features]
-default = []
-## Inbound TLS termination (rustls).
-tls = ["corx-server/tls"]
-## Mutual TLS (implies `tls`).
-mtls = ["corx-server/mtls"]
-## FIPS-validated crypto provider via aws-lc-rs.
-fips = ["corx-core/fips", "corx-server/fips"]
-## OpenTelemetry / OTLP tracing export.
-otel = ["corx-server/otel"]
-## All production optional features.
-full = ["tls", "mtls", "otel"]
-
-[dependencies]
-corx-core = { workspace = true }
-corx-server = { workspace = true }
 
 [lints]
 workspace = true
+
+[dependencies]
+http.workspace = true
+bytes.workspace = true
+url.workspace = true
+futures-core.workspace = true
+futures-util.workspace = true
+lol_html.workspace = true
+encoding_rs.workspace = true
+html-escape.workspace = true
+sha2.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

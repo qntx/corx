@@ -1,5 +1,5 @@
 {
   "title": "corx",
-  "description": "Documentation stub.",
-  "pages": ["index"]
+  "description": "Link-preview service — one pure core, two runtimes.",
+  "pages": ["index", "api", "security", "deployment"]
 }

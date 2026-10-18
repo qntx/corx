@@ -1,5 +1,6 @@
 [package]
 name = "corx-server"
+description = "Native link-preview server binary."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,84 +8,34 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 authors.workspace = true
-keywords.workspace = true
-categories.workspace = true
-description = "axum/tower bindings for the corx CORS proxy engine"
-readme = "README.md"
-
-[lib]
-name = "corx_server"
-path = "src/lib.rs"
-
-[features]
-default = []
-tls = ["dep:tokio-rustls", "dep:rustls-pemfile", "dep:axum-server"]
-mtls = ["tls"]
-fips = ["corx-core/fips"]
-otel = [
-    "dep:opentelemetry",
-    "dep:opentelemetry_sdk",
-    "dep:opentelemetry-otlp",
-    "dep:tracing-opentelemetry",
-]
-
-[dependencies]
-corx-core = { workspace = true }
-
-hyper = { workspace = true }
-hyper-util = { workspace = true }
-http = { workspace = true }
-http-body = { workspace = true }
-http-body-util = { workspace = true }
-bytes = { workspace = true }
-
-axum = { workspace = true }
-axum-server = { workspace = true, optional = true }
-tower = { workspace = true }
-tower-http = { workspace = true }
-
-tokio = { workspace = true }
-futures = { workspace = true }
-pin-project-lite = { workspace = true }
-
-rustls = { workspace = true }
-tokio-rustls = { workspace = true, optional = true }
-rustls-pemfile = { workspace = true, optional = true }
-
-governor = { workspace = true }
-regex = { workspace = true }
-ipnet = { workspace = true }
-
-arc-swap = { workspace = true }
-dashmap = { workspace = true }
-foldhash = { workspace = true }
-
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-metrics = { workspace = true }
-metrics-exporter-prometheus = { workspace = true }
-
-opentelemetry = { workspace = true, optional = true }
-opentelemetry_sdk = { workspace = true, optional = true }
-opentelemetry-otlp = { workspace = true, optional = true }
-tracing-opentelemetry = { workspace = true, optional = true }
-
-serde = { workspace = true }
-serde_json = { workspace = true }
-figment = { workspace = true }
-humantime-serde = { workspace = true }
-
-uuid = { workspace = true }
-
-thiserror = { workspace = true }
-anyhow = { workspace = true }
-
-[dev-dependencies]
-wiremock = { workspace = true }
-tokio = { workspace = true, features = ["test-util"] }
-http-body-util = { workspace = true }
-tower = { workspace = true, features = ["util"] }
-serde_json = { workspace = true }
+publish = false
 
 [lints]
 workspace = true
+
+[[bin]]
+name = "corx"
+path = "src/main.rs"
+
+[dependencies]
+corx.workspace = true
+tokio.workspace = true
+axum.workspace = true
+tower.workspace = true
+reqwest.workspace = true
+moka.workspace = true
+governor.workspace = true
+axum-client-ip.workspace = true
+clap.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+metrics.workspace = true
+metrics-exporter-prometheus.workspace = true
+futures-util.workspace = true
+http.workspace = true
+bytes.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
