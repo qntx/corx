@@ -3,75 +3,29 @@
 All notable changes to `corx` are documented in this file.
 
 The format is loosely based on [Keep a Changelog]; the project follows
-[Semantic Versioning] for the public API exposed by `corx-core` and the
-binary CLI surface.
+[Semantic Versioning] for the public API exposed by the `corx` crate and
+the HTTP contract of the preview endpoint.
 
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
-## [Unreleased]
-
-### Added
-
-- `[security.preflight]` — `mode = "enforce"|"open"` (default `enforce`) and
-  `rate_limit` (default `true`) so preflights participate in origin/rate
-  guards by default.
-- `[security.auth]` — optional `bearer` shared-secret authentication.
-- `security.require_client_binding` — hard-fail startup without origin
-  whitelist, bearer auth, or mTLS.
-- `[target]` — host/scheme admission (`any_public` | `allowlist` | `denylist`),
-  enforced on **every redirect hop**.
-- `[circuit_breaker]` — process-local per-host circuit breaker (`max_hosts`
-  soft cap, default 8192).
-- `limits.redirect_policy` — `follow` | `block` | `rewrite` (rewrite stamps
-  proxy path-prefix `Location`).
-- `limits.inflight_max` — process concurrency load-shed (moved from
-  `rate_limit.global`).
-- `limits.max_response_body_bytes` — streaming response size cap (default
-  50 MiB; `0` = unlimited).
-- `rate_limit.max_keys` — fail-closed cardinality cap for keyed GCRA maps.
-- `cors.origins` + `cors.allow_any_origin` (unified origin list).
-- CatchPanic layer; load-shed inflight RAII permit; hot-reload retains
-  circuit / rate-limit maps when those config sections are unchanged.
+## [0.3.0] - 2026-10-18
 
 ### Changed (BREAKING)
 
-- `rate_limit.global.inflight_max` **removed** — use `limits.inflight_max`.
-- `rate_limit.enabled` default is now **`true`** (GCRA on by default).
-- Client error JSON `message` is kind-stable (no internal DNS/connect detail).
-- `CircuitDecision` public enum removed; `CircuitBreaker::check` returns
-  `Result<(), ProxyError>`.
-- CORS middleware sits outside auth/load-shed/header-limit so 401/503/431
-  include CORS headers; success path no longer double-stamps CORS in the
-  handler.
+- Complete rewrite: corx is now a **link-preview service** (`GET
+  /v1/preview?url=…` → JSON metadata) instead of a CORS forwarding proxy.
+- One pure core crate `crates/corx` (no I/O, compiles on native and
+  `wasm32-unknown-unknown`) with two thin adapters: `corx-server` (native
+  Axum binary) and `corx-worker` (Cloudflare Worker via workers-rs).
+- The full request pipeline — routing, CORS, rate admission, shared cache,
+  timed preview fetch and rendering — lives in `corx::service`; both
+  adapters only implement the `service::Runtime` trait, so behaviour is
+  identical across runtimes.
+- All previous configuration (TOML file, CLI subcommands) replaced by a
+  small set of `CORX_*` env vars / flags.
+- Helm chart, Compose files and the old proxy code have been removed.
 
-- Cleartext listeners honour `server.graceful_shutdown` with a force-abort
-  deadline after SIGTERM/Ctrl+C (previously only the TLS path used the
-  duration).
-- Default Helm chart `config` aligned with `corx-core` serde shapes.
-- CORS: removed `allowlist` / `explicit` fields; use `origins` +
-  `allow_any_origin` (default `false` — fail-closed reflection).
-- `corx-core` depends on `tower-service` only (not full `tower`).
-- **Workspace layout:** `corx` is now the **umbrella library**; the binary
-  lives in package `corx-cli` (binary name still `corx`). Embedders should
-  depend on `corx`. Run with `cargo run -p corx-cli`.
-- Dependency floor raised across the workspace (hyper 1.11, tokio 1.53,
-  governor 0.10, metrics-exporter-prometheus 0.18, OpenTelemetry 0.30
-  family, axum-server 0.8, rustls-platform-verifier 0.6, …). See
-  `Cargo.toml` `[workspace.dependencies]`.
-- `Upstream::new` is now fallible (platform TLS verifier load).
-
-### Fixed
-
-- `limits.max_request_header_bytes` is enforced (`431`).
-- Preflight no longer bypasses origin blacklist / whitelist when
-  `security.preflight.mode = "enforce"`.
-
-### Removed
-
-- Placeholder WebSocket metrics and related documentation (capability was
-  never implemented).
-- CORS config fields `allowlist` and `explicit`.
 
 ## [0.2.0] -- enterprise upgrade
 

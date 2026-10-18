@@ -1,53 +1,34 @@
-# Justfile for Rust project using Cargo
+# corx — link-preview service
 
-all: fmt clippy-fix
+default:
+    @just --list
 
-# Build the project with all features enabled in release mode
-build:
-    cargo build --workspace --release --all-features
+# Format all code.
+fmt:
+    cargo fmt --all
 
-# Check the project for compilation errors without producing binaries
-check:
-    cargo check --workspace --all-features
+# Strict clippy on the native workspace.
+clippy:
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-# Update dependencies to their latest compatible versions
-update:
-    cargo update
+# Strict clippy for the wasm crates.
+clippy-wasm:
+    rustup target add wasm32-unknown-unknown
+    cargo clippy -p corx -p corx-worker --target wasm32-unknown-unknown --all-features -- -D warnings
 
-# Run the project with all features enabled in release mode
-run:
-    cargo run --release --all-features
-
-# Run all tests with all features enabled
+# Run the test suite.
 test:
     cargo test --workspace --all-features
 
-# Run benchmarks with all features enabled
-bench:
-    cargo bench --all-features
+# wasm32 check for the core and worker crates.
+check-wasm:
+    rustup target add wasm32-unknown-unknown
+    cargo check -p corx -p corx-worker --target wasm32-unknown-unknown
 
-# Run Clippy linter with nightly toolchain (check only, for CI)
-# Uses workspace lints from Cargo.toml
-clippy:
-    cargo +nightly clippy --workspace \
-        --all-targets \
-        --all-features \
-        -- -D warnings
+# Run the Worker locally (installs wrangler + worker-build via npm/cargo).
+worker-dev:
+    cd crates/corx-worker && npx wrangler@4.149.0 dev --var ALLOWED_ORIGINS:http://localhost:5173
 
-# Run Clippy linter with auto-fix (for development)
-clippy-fix:
-    cargo +nightly clippy --workspace \
-        --fix \
-        --all-targets \
-        --all-features \
-        --allow-dirty \
-        --allow-staged \
-        -- -D warnings
-
-# Format the code using rustfmt with nightly toolchain
-fmt:
-    cargo +nightly fmt
-
-# Generate documentation for all crates and open it in the browser
-doc:
-    cargo +nightly doc --all-features --no-deps --open
+# Deploy the Worker to Cloudflare.
+worker-deploy:
+    cd crates/corx-worker && npx wrangler@4.149.0 deploy

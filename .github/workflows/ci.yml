@@ -15,4 +15,13 @@ jobs:
     permissions:
       contents: read
     with:
-      submodules: true
+      deny: true
+
+  wasm:
+    uses: qntx/workflows/.github/workflows/ci-rust-cross.yml@v2
+    permissions:
+      contents: read
+    with:
+      targets: wasm32-unknown-unknown
+      packages: corx corx-worker
+      features: --all-features

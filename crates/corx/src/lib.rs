@@ -1,57 +1,49 @@
-//! `corx` — umbrella library for the CORS forwarding proxy stack.
-//!
-//! This crate is the **recommended dependency** for embedding corx in another
-//! binary or service. It re-exports the engine ([`core`]) and the production
-//! HTTP binding ([`server`]), and forwards Cargo features (`tls`, `mtls`,
-//! `fips`, `otel`) to the underlying crates.
-//!
-//! # Crate layout
-//!
-//! | Crate | Role |
-//! |-------|------|
-//! | [`corx`](crate) | Public facade (this crate) |
-//! | [`corx_core`] | Framework-agnostic proxy engine |
-//! | [`corx_server`] | axum / tower production server |
-//! | `corx-cli` | Binary (`corx` command) |
-//!
-//! Advanced embedders may depend on `corx-core` or `corx-server` directly
-//! when they need a narrower dependency graph.
-//!
-//! # Example
-//!
-//! ```ignore
-//! use corx::{AppState, Config, ServerBuild, build_router, run};
-//! use corx::server::config_loader;
-//!
-//! # async fn demo() -> anyhow::Result<()> {
-//! let config = config_loader::load(None)?;
-//! let metrics = corx::server::observability::init_metrics()?;
-//! let build = ServerBuild::from_config(config.clone(), metrics)?;
-//! let ready = std::sync::Arc::clone(&build.ready);
-//! let router = build_router(AppState::new(build));
-//! run(&config.server, router, ready).await?;
-//! # Ok(())
-//! # }
-//! ```
+//! `corx` — link-preview core: validated targets, SSRF guard, a sans-IO
+//! streaming HTML metadata extractor, and the request/response shaping shared
+//! by the native server and the Cloudflare Worker adapters.
 
-#![forbid(unsafe_code)]
-#![deny(missing_docs)]
+use core::time::Duration;
 
-/// Framework-agnostic engine: config, policy, proxy, errors.
-pub use corx_core as core;
-// ── Convenience re-exports (root surface) ─────────────────────────────────
-pub use corx_core::config::{
-    AuthConfig, AuthMode, CircuitBreakerConfig, Config, ConfigError, CorsConfig, CorsPolicyKind,
-    ForwardedConfig, LimitsConfig, ObservabilityConfig, PreflightConfig, PreflightMode,
-    RateLimitConfig, RedirectPolicy, SecurityConfig, ServerConfig, SsrfConfig, SsrfMode,
-    TargetConfig, TargetMode, TlsConfig, UpstreamConfig, ValidationReport,
-};
-pub use corx_core::error::{ErrorKind, ErrorPayload, ProxyError, STATUS_HEADER};
-pub use corx_core::policy::{CircuitBreaker, CircuitHop, TargetPolicy};
-pub use corx_core::proxy::{
-    ClientConfig, CorsPolicy, HeaderFilter, SsrfGuard, TargetUrl, Upstream, UpstreamBody,
-    apply_to_response, build_preflight_response, extract_target, is_preflight,
-};
-/// Production axum/tower server binding, middleware, and lifecycle.
-pub use corx_server as server;
-pub use corx_server::{AppState, ServerBuild, build_router, run};
+pub mod error;
+mod extract;
+mod fetch;
+pub mod http;
+pub mod ip;
+mod maybe_send;
+mod preview;
+pub mod service;
+mod target;
+
+pub use error::Error;
+pub use fetch::{Fetch, FetchError};
+pub use maybe_send::{MaybeSend, MaybeSync};
+pub use preview::{Image, Preview, preview};
+pub use target::Target;
+
+/// Maximum accepted length of a target URL, in bytes.
+pub const MAX_URL_LEN: usize = 2048;
+
+/// Maximum number of HTML body bytes fed to the extractor.
+pub const MAX_HTML_BYTES: usize = 1 << 20;
+
+/// Maximum number of redirects followed per preview.
+pub const MAX_REDIRECTS: usize = 5;
+
+/// Timeout for a single upstream connection attempt.
+pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Wall-clock budget for the whole preview (all redirect hops).
+pub const TOTAL_TIMEOUT: Duration = Duration::from_secs(4);
+
+/// Default upstream `User-Agent`; deployments override it with their own.
+pub const DEFAULT_USER_AGENT: &str = concat!(
+    "corx/",
+    env!("CARGO_PKG_VERSION"),
+    " (+https://github.com/qntx/corx)"
+);
+
+/// `Accept` header sent upstream.
+pub const ACCEPT: &str = "text/html,application/xhtml+xml";
+
+/// `Cache-Control` emitted for a successful preview.
+pub const CACHE_CONTROL_SUCCESS: &str = "public, max-age=86400, stale-while-revalidate=604800";

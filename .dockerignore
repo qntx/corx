@@ -8,12 +8,12 @@ target/
 .windsurf/
 .DS_Store
 
-# Existing CI / chart artefacts -- already shipped from elsewhere.
-charts/
-docs/
+# Worker build artefacts (native image builds the server only).
+crates/corx-worker/build/
+crates/corx-worker/node_modules/
+crates/corx-worker/.wrangler/
 
-# Integration tests are not needed for the image build; keep benches so
-# cargo-chef can parse package manifests that declare [[bench]] targets.
+docs/
 **/tests/
 **/*.bench.rs
 

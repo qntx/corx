@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "corx",
+  "main": "build/index.js",
+  "compatibility_date": "2026-10-01",
+  // SSRF control: global fetch may only route to public-internet
+  // destinations; it cannot reach same-zone/origin hosts.
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "build": {
+    "command": "cargo install -q worker-build --locked --version 0.8.7 && worker-build --release"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "ratelimits": [
+    {
+      "name": "IP_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 120, "period": 60 }
+    },
+    {
+      "name": "HOST_LIMITER",
+      "namespace_id": "1002",
+      "simple": { "limit": 120, "period": 60 }
+    }
+  ],
+  "vars": {
+    // Deployments MUST set this to a comma-separated Origin allowlist
+    // (or "*" for fully public). Empty = no browser Origin is allowed.
+    // Optional USER_AGENT overrides the versioned corx default.
+    "ALLOWED_ORIGINS": ""
+  }
+}
