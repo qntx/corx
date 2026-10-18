@@ -19,3 +19,7 @@ jobs:
       packages: write
       id-token: write
       attestations: write
+    with:
+      # arm64 is built under QEMU on an amd64 runner; a release Rust build
+      # (LTO, one codegen unit) exceeds the 45-minute default.
+      timeout-minutes: 120
