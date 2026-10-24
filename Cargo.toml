@@ -31,7 +31,7 @@ futures-util = { version = "0.3.34", default-features = false, features = ["std"
 lol_html    = "3.0.1"
 mime        = "0.3.17"
 encoding_rs = "0.8.42"
-html-escape = "0.2.15"
+html-escape = "0.3.0"
 sha2        = "0.11.0"
 
 # Serialization / errors
