@@ -19,7 +19,8 @@
     },
     "body": {
       "error": "upstream_status",
-      "message": "the upstream server returned an unexpected status"
+      "message": "the upstream server returned an unexpected status",
+      "upstreamStatus": 304
     }
   }
 }

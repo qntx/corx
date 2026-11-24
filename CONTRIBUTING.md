@@ -49,7 +49,10 @@ These are the rules reviewers enforce:
   dropped whole (`clean_url`), while text fields truncate to their cap
   (`clean_text`).
 - Logs never contain the full target URL or the client IP — only the target
-  host and its `Target::fingerprint` (12 hex chars of SHA-256).
+  host and its `Target::fingerprint` (12 hex chars of SHA-256). Per-request
+  diagnostics are limited to `upstream_status` (the last upstream status
+  seen on a miss) and `hops` (redirects followed), both `None` for cache
+  hits, rejects and preflights.
 - No `unwrap`/`expect`/panics in non-test code; the workspace lint set runs
   under `-D warnings`.
 - `Send`/`Sync` bounds in the core go through `MaybeSend`/`MaybeSync`, which

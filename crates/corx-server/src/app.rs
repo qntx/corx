@@ -120,6 +120,8 @@ async fn preview<F: Fetch>(
         cache = cache,
         target_host = record.target_host.as_deref().unwrap_or("n/a"),
         target_fingerprint = record.target_fingerprint.as_deref().unwrap_or("n/a"),
+        upstream_status = record.upstream_status.map(|s| s.as_u16()),
+        hops = record.hops,
         "request"
     );
     res.map(Body::from)

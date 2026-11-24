@@ -35,10 +35,10 @@ impl Target {
     /// rejected.
     ///
     /// # Errors
-    /// `Error::UpstreamStatus` when `location` is unparseable; otherwise the
+    /// `Error::RedirectFailed` when `location` is unparseable; otherwise the
     /// same errors as [`Target::parse`].
     pub fn redirect(&self, location: &str) -> Result<Self, Error> {
-        let mut joined = self.0.join(location).map_err(|_| Error::UpstreamStatus)?;
+        let mut joined = self.0.join(location).map_err(|_| Error::RedirectFailed)?;
         if self.0.scheme() == "https" && joined.scheme() == "http" {
             return Err(Error::BlockedTarget);
         }
@@ -233,8 +233,8 @@ mod tests {
             Err(Error::BlockedTarget)
         );
         assert_eq!(http.redirect("//localhost/x"), Err(Error::BlockedTarget));
-        // Unparseable Location is an upstream problem.
-        assert_eq!(http.redirect("http://[bad"), Err(Error::UpstreamStatus));
+        // Unparseable Location is a redirect failure.
+        assert_eq!(http.redirect("http://[bad"), Err(Error::RedirectFailed));
         // Redirect to a non-http scheme is just an invalid target.
         assert_eq!(http.redirect("ftp://a.example/x"), Err(Error::InvalidUrl));
         // Fragment on the location is stripped.

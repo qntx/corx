@@ -17,7 +17,7 @@ mod target;
 pub use error::Error;
 pub use fetch::{Fetch, FetchError};
 pub use maybe_send::{MaybeSend, MaybeSync};
-pub use preview::{Image, Media, Page, Preview, Source, preview};
+pub use preview::{Image, Media, Page, Preview, Source, Trace, preview};
 pub use target::Target;
 
 /// Maximum accepted length of a target URL, in bytes.
@@ -33,7 +33,7 @@ pub const MAX_REDIRECTS: usize = 5;
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// Wall-clock budget for the whole preview (all redirect hops).
-pub const TOTAL_TIMEOUT: Duration = Duration::from_secs(4);
+pub const TOTAL_TIMEOUT: Duration = Duration::from_secs(6);
 
 /// Default upstream `User-Agent`; deployments override it with their own.
 pub const DEFAULT_USER_AGENT: &str = concat!(

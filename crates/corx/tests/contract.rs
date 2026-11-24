@@ -15,10 +15,11 @@
 use std::collections::BTreeSet;
 use std::sync::LazyLock;
 
+use ::http::StatusCode;
 use corx::http;
 use corx::{Error, Image, Media, Page, Preview, Source};
 use jsonschema::{Draft, Validator};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 fn schema_json() -> &'static Value {
     static SCHEMA: LazyLock<Value> = LazyLock::new(|| {
@@ -50,7 +51,7 @@ fn assert_valid(instance: &Value) {
 /// Every `Error` variant; `index`'s `match` has no wildcard, so a new
 /// variant fails to compile until this list — and the schema's `error`
 /// enum — is updated.
-fn all_errors() -> [Error; 13] {
+fn all_errors() -> [Error; 14] {
     const fn index(error: Error) -> usize {
         match error {
             Error::InvalidUrl => 0,
@@ -61,11 +62,12 @@ fn all_errors() -> [Error; 13] {
             Error::MethodNotAllowed => 5,
             Error::TooLarge => 6,
             Error::UnsupportedContent => 7,
-            Error::UpstreamStatus => 8,
-            Error::RateLimited => 9,
-            Error::UpstreamUnreachable => 10,
-            Error::Overloaded => 11,
-            Error::UpstreamTimeout => 12,
+            Error::RedirectFailed => 8,
+            Error::UpstreamStatus(_) => 9,
+            Error::RateLimited => 10,
+            Error::UpstreamUnreachable => 11,
+            Error::Overloaded => 12,
+            Error::UpstreamTimeout => 13,
         }
     }
     let all = [
@@ -77,7 +79,8 @@ fn all_errors() -> [Error; 13] {
         Error::MethodNotAllowed,
         Error::TooLarge,
         Error::UnsupportedContent,
-        Error::UpstreamStatus,
+        Error::RedirectFailed,
+        Error::UpstreamStatus(StatusCode::FORBIDDEN),
         Error::RateLimited,
         Error::UpstreamUnreachable,
         Error::Overloaded,
@@ -224,9 +227,27 @@ fn field_sets_match() {
     let media = serde_json::to_value(maximal_media()).expect("serializes");
     assert_eq!(object_keys(&media), property_keys("media"), "media fields");
 
-    let res = http::render(&Err(Error::InvalidUrl));
+    // upstream_status carries the optional upstreamStatus property — the
+    // fullest error body, so its key set equals the schema's.
+    let res = http::render(&Err(Error::UpstreamStatus(StatusCode::FORBIDDEN)));
     let error: Value = serde_json::from_slice(res.body()).expect("error is JSON");
     assert_eq!(object_keys(&error), property_keys("error"), "error fields");
+}
+
+/// The if/then/else rule: `upstreamStatus` is required exactly when
+/// `error` is `upstream_status` — absent everywhere else.
+#[test]
+fn upstream_status_rule() {
+    let missing = json!({"error": "upstream_status", "message": "m"});
+    assert!(
+        !validator().is_valid(&missing),
+        "upstream_status without upstreamStatus must be rejected"
+    );
+    let misplaced = json!({"error": "not_found", "message": "m", "upstreamStatus": 404});
+    assert!(
+        !validator().is_valid(&misplaced),
+        "upstreamStatus on a non-upstream_status error must be rejected"
+    );
 }
 
 /// Every vector's `expect.body` must itself satisfy the schema — a vector

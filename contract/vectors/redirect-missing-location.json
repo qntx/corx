@@ -18,8 +18,8 @@
       "cache-control": "public, max-age=3600"
     },
     "body": {
-      "error": "upstream_status",
-      "message": "the upstream server returned an unexpected status"
+      "error": "redirect_failed",
+      "message": "the upstream redirect is missing, malformed, or exceeds the hop limit"
     }
   }
 }

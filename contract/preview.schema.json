@@ -72,6 +72,7 @@
             "method_not_allowed",
             "too_large",
             "unsupported_content",
+            "redirect_failed",
             "upstream_status",
             "rate_limited",
             "upstream_unreachable",
@@ -79,8 +80,14 @@
             "upstream_timeout"
           ]
         },
-        "message": { "type": "string", "minLength": 1 }
-      }
+        "message": { "type": "string", "minLength": 1 },
+        "upstreamStatus": { "type": "integer", "minimum": 100, "maximum": 599 }
+      },
+      "if": {
+        "properties": { "error": { "const": "upstream_status" } }
+      },
+      "then": { "required": ["upstreamStatus"] },
+      "else": { "not": { "required": ["upstreamStatus"] } }
     }
   }
 }

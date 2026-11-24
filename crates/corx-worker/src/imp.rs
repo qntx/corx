@@ -319,6 +319,8 @@ async fn handle(req: Request, env: Env, ctx: Context) -> worker::Result<Response
         "cache": record.cache.map_or("none", |c| c.as_str()),
         "target_host": record.target_host,
         "target_fingerprint": record.target_fingerprint,
+        "upstream_status": record.upstream_status.map(|s| s.as_u16()),
+        "hops": record.hops,
     });
     console_log!("{line}");
     to_worker(&res)

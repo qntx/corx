@@ -54,11 +54,15 @@ pub fn route(method: &Method, uri: &Uri) -> Result<Route, Error> {
     Target::parse(&raw).map(Route::Preview)
 }
 
-/// The JSON error body: `{"error": slug, "message": msg}`.
+/// The JSON error body: `{"error": slug, "message": msg}` plus
+/// `upstreamStatus` on `upstream_status` errors.
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ErrorBody {
     error: &'static str,
     message: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    upstream_status: Option<u16>,
 }
 
 /// Serializes a preview result into the JSON response contract.
@@ -79,6 +83,7 @@ pub fn render(result: &Result<Preview, Error>) -> http::Response<Bytes> {
             serde_json::to_vec(&ErrorBody {
                 error: err.slug(),
                 message: err.message(),
+                upstream_status: err.upstream_status().map(|s| s.as_u16()),
             })
             .unwrap_or_else(|_| b"{}".to_vec()),
             HeaderValue::from_static(err.cache_control()),
@@ -288,7 +293,8 @@ mod tests {
             Error::MethodNotAllowed,
             Error::TooLarge,
             Error::UnsupportedContent,
-            Error::UpstreamStatus,
+            Error::RedirectFailed,
+            Error::UpstreamStatus(StatusCode::FORBIDDEN),
             Error::RateLimited,
             Error::UpstreamUnreachable,
             Error::Overloaded,

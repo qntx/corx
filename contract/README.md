@@ -92,7 +92,11 @@ read:
 
 Every non-success response (except the `204` preflight, which is empty) is
 `{"error": <slug>, "message": <sentence>}`. `message` is stable but meant
-for humans; `error` is the machine contract.
+for humans; `error` is the machine contract. An `upstream_status` body
+additionally carries `upstreamStatus`: the final hop's status code as an
+integer — any non-2xx status that is not one of the five followed
+redirects, so 300/304, 4xx and 5xx all land here. `upstreamStatus` never
+appears on any other error.
 
 | status | `error` | meaning | cacheable | extra headers |
 |---|---|---|---|---|
@@ -104,7 +108,8 @@ for humans; `error` is the machine contract.
 | 405 | `method_not_allowed` | method other than GET/HEAD/OPTIONS | no | `Allow` |
 | 413 | `too_large` | HTML exceeded 1 MiB before `</head>` | no | |
 | 415 | `unsupported_content` | `Content-Type` missing or unparseable | no | |
-| 422 | `upstream_status` | non-2xx status or malformed redirect (bad/missing `Location`, > 5 hops) | yes (`max-age=3600`) | |
+| 422 | `redirect_failed` | a followed 3xx had a missing, non-ASCII or unparseable `Location`, or the chain exceeded 5 hops | yes (`max-age=3600`) | |
+| 422 | `upstream_status` | the final hop answered a non-2xx, non-followed status | yes (`max-age=3600`) | `upstreamStatus` in the body |
 | 429 | `rate_limited` | client or per-host limit exceeded | no | `Retry-After` (seconds, ≥ 1) |
 | 502 | `upstream_unreachable` | the target could not be reached | no | |
 | 503 | `overloaded` | the deployment is shedding load | no | |
@@ -116,13 +121,13 @@ responses carry it too.
 ## `Cache-Control`
 
 - success: `public, max-age=86400, stale-while-revalidate=604800`
-- `no_metadata` and `upstream_status`: `public, max-age=3600`
+- `no_metadata`, `redirect_failed` and `upstream_status`: `public, max-age=3600`
 - every other error: `no-store`
 
 ## Limits and upstream behaviour
 
 - Target URL ≤ 2048 bytes; at most 5 redirects; ≤ 1 MiB of HTML is read.
-- Upstream connect deadline 3 s; total preview budget 4 s.
+- Upstream connect deadline 3 s; total preview budget 6 s.
 - Upstream requests send a single deployment-configured `User-Agent` and
   `Accept: text/html,application/xhtml+xml`, never cookies. Redirects are
   followed by the service itself, not the HTTP stack, so every hop is

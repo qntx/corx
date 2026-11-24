@@ -84,6 +84,9 @@ pub struct Fresh {
     pub outcome: &'static str,
     /// Whether the runtime may store the response.
     pub cacheable: bool,
+    /// What the upstream exchange looked like; `None` when admission
+    /// denied before any fetch.
+    pub trace: Option<crate::Trace>,
 }
 
 /// Result of a runtime cache lookup.
@@ -145,6 +148,12 @@ pub struct Record {
     pub target_host: Option<String>,
     /// Privacy-preserving target fingerprint.
     pub target_fingerprint: Option<String>,
+    /// Status of the last upstream response received on a miss;
+    /// `None` for cache hits, rejects and preflights.
+    pub upstream_status: Option<StatusCode>,
+    /// Redirect responses received on a miss ([`crate::Trace::hops`]);
+    /// `None` for cache hits, rejects and preflights.
+    pub hops: Option<u8>,
 }
 
 /// Renders a rate-limit denial: `429` plus `Retry-After` (at least one
@@ -164,15 +173,21 @@ async fn miss<R: Runtime>(rt: &R, target: crate::Target) -> Fresh {
             response: rate_limited(retry_after_secs),
             outcome: Error::RateLimited.slug(),
             cacheable: false,
+            trace: None,
         };
     }
-    let work = preview(rt.fetcher(), target, rt.now_unix_secs());
-    let timeout = rt.sleep(TOTAL_TIMEOUT);
-    let mut work = core::pin::pin!(work);
-    let mut timeout = core::pin::pin!(timeout);
-    let result = match select(work.as_mut(), timeout.as_mut()).await {
-        Either::Left((result, _)) => result,
-        Either::Right(_) => Err(Error::UpstreamTimeout),
+    let mut trace = crate::Trace::default();
+    let result = {
+        // `work` borrows `trace`; it must be dropped before the trace is
+        // read, so the trace is meaningful even when the timer wins.
+        let work = preview(rt.fetcher(), target, rt.now_unix_secs(), &mut trace);
+        let timeout = rt.sleep(TOTAL_TIMEOUT);
+        let mut work = core::pin::pin!(work);
+        let mut timeout = core::pin::pin!(timeout);
+        match select(work.as_mut(), timeout.as_mut()).await {
+            Either::Left((result, _)) => result,
+            Either::Right(_) => Err(Error::UpstreamTimeout),
+        }
     };
     let outcome = result.as_ref().map_or_else(|e| e.slug(), |_| "ok");
     let cacheable = result.as_ref().map_or_else(|e| e.is_cacheable(), |_| true);
@@ -180,6 +195,7 @@ async fn miss<R: Runtime>(rt: &R, target: crate::Target) -> Fresh {
         response: render(&result),
         outcome,
         cacheable,
+        trace: Some(trace),
     }
 }
 
@@ -194,16 +210,16 @@ pub async fn handle<R: Runtime>(
     origins: &Origins,
     req: Incoming<'_>,
 ) -> (http::Response<Bytes>, Record) {
-    let (mut response, outcome, cache, target) = 'pipeline: {
+    let (mut response, outcome, cache, target, trace) = 'pipeline: {
         let routed = match route(req.method, req.uri) {
-            Err(e) => break 'pipeline (render(&Err(e)), e.slug(), None, None),
+            Err(e) => break 'pipeline (render(&Err(e)), e.slug(), None, None, None),
             Ok(routed) => routed,
         };
         if let Err(e) = origins.check(req.origin) {
-            break 'pipeline (render(&Err(e)), e.slug(), None, None);
+            break 'pipeline (render(&Err(e)), e.slug(), None, None, None);
         }
         let Route::Preview(target) = routed else {
-            break 'pipeline (origins.preflight(req.origin), "preflight", None, None);
+            break 'pipeline (origins.preflight(req.origin), "preflight", None, None, None);
         };
 
         let client_key = req.client_ip.map_or_else(
@@ -218,6 +234,7 @@ pub async fn handle<R: Runtime>(
                 Error::RateLimited.slug(),
                 None,
                 Some(info),
+                None,
             );
         }
 
@@ -230,12 +247,14 @@ pub async fn handle<R: Runtime>(
                 "cached",
                 Some(CacheStatus::Hit),
                 Some((host, fingerprint)),
+                None,
             ),
             Cached::Miss(fresh) => (
                 fresh.response,
                 fresh.outcome,
                 Some(CacheStatus::Miss),
                 Some((host, fingerprint)),
+                fresh.trace,
             ),
         }
     };
@@ -246,6 +265,8 @@ pub async fn handle<R: Runtime>(
         cache,
         target_host: target.as_ref().map(|(host, _)| host.clone()),
         target_fingerprint: target.map(|(_, fingerprint)| fingerprint),
+        upstream_status: trace.and_then(|t| t.upstream_status),
+        hops: trace.map(|t| t.hops),
     };
     (response, record)
 }
@@ -272,7 +293,8 @@ mod tests {
     struct FakeFetch {
         calls: AtomicUsize,
         routes: HashMap<String, http::Response<Vec<Bytes>>>,
-        hang: bool,
+        /// Hang every call beyond this many — `0` hangs them all.
+        hang_after: usize,
     }
 
     impl Fetch for FakeFetch {
@@ -282,8 +304,7 @@ mod tests {
             &self,
             url: &Url,
         ) -> impl Future<Output = Result<http::Response<Self::Body>, FetchError>> + Send {
-            self.calls.fetch_add(1, Ordering::Relaxed);
-            if self.hang {
+            if self.calls.fetch_add(1, Ordering::Relaxed) >= self.hang_after {
                 return Either::Left(std::future::pending());
             }
             let out = self
@@ -314,7 +335,7 @@ mod tests {
                 fetcher: FakeFetch {
                     calls: AtomicUsize::new(0),
                     routes: HashMap::new(),
-                    hang: false,
+                    hang_after: usize::MAX,
                 },
                 cache: Mutex::new(HashMap::new()),
                 denied: Mutex::new(HashMap::new()),
@@ -564,7 +585,7 @@ mod tests {
     #[test]
     fn timeout_is_504_and_not_cached() {
         let (mut rt, origins, _) = fixture();
-        rt.fetcher.hang = true;
+        rt.fetcher.hang_after = 0;
         rt.sleep_ready = true;
         let method = Method::GET;
         let uri: Uri = URI.parse().expect("uri");
@@ -573,11 +594,77 @@ mod tests {
         assert_eq!(res.status(), StatusCode::GATEWAY_TIMEOUT);
         assert_eq!(rec.outcome, "upstream_timeout");
         rt.sleep_ready = false;
-        rt.fetcher.hang = false;
+        rt.fetcher.hang_after = usize::MAX;
         // next request misses again — nothing was stored
         let (res2, rec2) =
             futures_executor::block_on(handle(&rt, &origins, incoming(&method, &uri, None, None)));
         assert_eq!(res2.status(), StatusCode::OK);
         assert_eq!(rec2.cache, Some(CacheStatus::Miss));
+    }
+
+    #[test]
+    fn timeout_after_redirect_reports_trace() {
+        let (mut rt, origins, _) = fixture();
+        let mut redirect = http::Response::new(Vec::new());
+        *redirect.status_mut() = StatusCode::FOUND;
+        redirect.headers_mut().insert(
+            http::header::LOCATION,
+            HeaderValue::from_static("https://b.com/"),
+        );
+        rt.fetcher.routes.insert("https://a.com/".into(), redirect);
+        // First hop answers with the 302, the next hangs → budget wins.
+        rt.fetcher.hang_after = 1;
+        rt.sleep_ready = true;
+        let method = Method::GET;
+        let uri: Uri = URI.parse().expect("uri");
+        let (res, rec) =
+            futures_executor::block_on(handle(&rt, &origins, incoming(&method, &uri, None, None)));
+        assert_eq!(res.status(), StatusCode::GATEWAY_TIMEOUT);
+        assert_eq!(rec.upstream_status, Some(StatusCode::FOUND));
+        assert_eq!(rec.hops, Some(1));
+    }
+
+    #[test]
+    fn upstream_status_in_body_and_record() {
+        let (mut rt, origins, _) = fixture();
+        let mut denied = http::Response::new(Vec::new());
+        *denied.status_mut() = StatusCode::FORBIDDEN;
+        rt.fetcher.routes.insert("https://a.com/".into(), denied);
+        let method = Method::GET;
+        let uri: Uri = URI.parse().expect("uri");
+        let (res, rec) =
+            futures_executor::block_on(handle(&rt, &origins, incoming(&method, &uri, None, None)));
+        assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let body: serde_json::Value = serde_json::from_slice(res.body()).expect("body json");
+        assert_eq!(
+            body.get("error").and_then(serde_json::Value::as_str),
+            Some("upstream_status")
+        );
+        assert_eq!(
+            body.get("upstreamStatus")
+                .and_then(serde_json::Value::as_u64),
+            Some(403)
+        );
+        assert_eq!(rec.upstream_status, Some(StatusCode::FORBIDDEN));
+        assert_eq!(rec.hops, Some(0));
+    }
+
+    #[test]
+    fn cache_hit_reports_no_trace() {
+        let (rt, origins, _) = fixture();
+        let method = Method::GET;
+        let uri: Uri = URI.parse().expect("uri");
+        for _ in 0..2 {
+            let _ = futures_executor::block_on(handle(
+                &rt,
+                &origins,
+                incoming(&method, &uri, None, None),
+            ));
+        }
+        let (_, rec) =
+            futures_executor::block_on(handle(&rt, &origins, incoming(&method, &uri, None, None)));
+        assert_eq!(rec.outcome, "cached");
+        assert_eq!(rec.upstream_status, None);
+        assert_eq!(rec.hops, None);
     }
 }

@@ -122,6 +122,17 @@ fn resolve(raw: &str, base: &Url) -> Option<String> {
     }
 }
 
+/// What the upstream exchange looked like; filled in as the pipeline runs,
+/// so it is meaningful even when the budget timer wins.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Trace {
+    /// Redirect responses received: each followed one, plus one refused
+    /// for a bad `Location` or for exceeding `MAX_REDIRECTS`.
+    pub hops: u8,
+    /// Status of the last upstream response received, if any.
+    pub upstream_status: Option<::http::StatusCode>,
+}
+
 fn is_redirect(status: ::http::StatusCode) -> bool {
     matches!(
         status,
@@ -149,29 +160,30 @@ pub async fn preview<F: Fetch>(
     fetch: &F,
     target: Target,
     now_unix_secs: u64,
+    trace: &mut Trace,
 ) -> Result<Preview, Error> {
     let original = target.as_str().to_owned();
     let mut current = target;
-    let mut hops = 0usize;
     loop {
         let response = fetch.get(current.as_url()).await?;
+        trace.upstream_status = Some(response.status());
         if is_redirect(response.status()) {
-            hops += 1;
+            trace.hops = trace.hops.saturating_add(1);
             let Some(location) = response
                 .headers()
                 .get(::http::header::LOCATION)
                 .and_then(|v| v.to_str().ok())
             else {
-                return Err(Error::UpstreamStatus);
+                return Err(Error::RedirectFailed);
             };
-            if hops > MAX_REDIRECTS {
-                return Err(Error::UpstreamStatus);
+            if usize::from(trace.hops) > MAX_REDIRECTS {
+                return Err(Error::RedirectFailed);
             }
             current = current.redirect(location)?;
             continue;
         }
         if !response.status().is_success() {
-            return Err(Error::UpstreamStatus);
+            return Err(Error::UpstreamStatus(response.status()));
         }
         let content_type = response
             .headers()
