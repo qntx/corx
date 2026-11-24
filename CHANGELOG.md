@@ -50,6 +50,10 @@ the HTTP contract of the preview endpoint.
   crafted page took down the native server (#65).
 - Title extraction depended on body chunk boundaries when `done` fired
   mid-title (#65).
+- The 2048-byte URL limit was checked before normalization only, so a
+  target or Location could normalize to a longer URL (a cache key
+  `Target::parse` rejects). Locations resolving to inadmissible URLs are
+  now `redirect_failed`, not `invalid_url` (#65).
 
 ### Security
 
