@@ -18,7 +18,8 @@ gets `404 not_found`. HEAD runs the identical pipeline — adapters strip the
 body.
 
 The `url` parameter is required, percent-encoded, and at most 2048 bytes
-after decoding; the first occurrence wins when it is repeated. It must be
+after decoding and normalization (percent-encoding can expand it); the
+first occurrence wins when it is repeated. It must be
 an `http` or `https` URL with a dotted public domain — no credentials, no
 explicit port, no IP literal, and not `localhost` or a name ending in
 `.localhost`, `.local`, `.internal`, `.arpa`, or `.onion`.
@@ -122,7 +123,7 @@ appears on any other error.
 | 405 | `method_not_allowed` | method other than GET/HEAD/OPTIONS | no | `Allow` |
 | 413 | `too_large` | HTML exceeded 1 MiB before `</head>` | no | |
 | 415 | `unsupported_content` | `Content-Type` missing or unparseable | no | |
-| 422 | `redirect_failed` | a followed 3xx had a missing, non-ASCII or unparseable `Location`, or the chain exceeded 5 hops | yes (`max-age=3600`) | |
+| 422 | `redirect_failed` | a followed 3xx had a missing, non-ASCII or unparseable `Location`, a `Location` resolving to a non-http(s) URL, credentials, an explicit port or more than 2048 bytes after normalization, or the chain exceeded 5 hops | yes (`max-age=3600`) | |
 | 422 | `upstream_status` | the final hop answered a non-2xx, non-followed status | yes (`max-age=3600`) | `upstreamStatus` in the body |
 | 429 | `rate_limited` | client or per-host limit exceeded | no | `Retry-After` (seconds, ≥ 1) |
 | 502 | `upstream_unreachable` | the target could not be reached | no | |
@@ -140,7 +141,7 @@ responses carry it too.
 
 ## Limits and upstream behaviour
 
-- Target URL ≤ 2048 bytes; at most 5 redirects; ≤ 1 MiB of HTML is read.
+- Normalized target URL ≤ 2048 bytes; at most 5 redirects; ≤ 1 MiB of HTML is read.
 - Upstream connect deadline 3 s; total preview budget 6 s.
 - Upstream requests send a single deployment-configured `User-Agent` and
   never cookies. `Accept` is `text/html,application/xhtml+xml` on HTML
