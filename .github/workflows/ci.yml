@@ -3,8 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+  # Any base branch, so every PR of a stack is checked on its own.
   pull_request:
-    branches: [main]
 
 permissions:
   contents: read
