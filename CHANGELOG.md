@@ -9,7 +9,7 @@ the HTTP contract of the preview endpoint.
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2026-11-24
 
 ### Changed (BREAKING)
 
