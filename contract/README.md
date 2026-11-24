@@ -142,6 +142,18 @@ responses carry it too.
   a 4xx other than 408 or 429; `no-store` otherwise
 - every other error: `no-store`
 
+## Diagnostic headers
+
+A response that reached the preview cache lookup carries
+`corx-cache: hit` or `corx-cache: miss`; `miss` also covers the host
+rate-limit and upstream-error outcomes produced inside the miss.
+Responses produced before the lookup — routing errors, `invalid_url`,
+`forbidden_origin`, preflights and client rate-limit rejections — carry
+no `corx-cache`. Like `Access-Control-*` it is stamped on the outgoing
+response only and never stored; a hit's `hit` is applied to the replayed
+entry. `corx-cache` is operational diagnostics, not part of the
+versioned contract — clients must not depend on it.
+
 ## Limits and upstream behaviour
 
 - Normalized target URL ≤ 2048 bytes; at most 5 redirects; ≤ 1 MiB of HTML is read.

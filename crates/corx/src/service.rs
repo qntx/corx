@@ -24,7 +24,7 @@ use http::header::RETRY_AFTER;
 use http::{HeaderValue, Method, StatusCode, Uri};
 
 use crate::fetch::Fetch;
-use crate::http::{Origins, Route, render, route};
+use crate::http::{CACHE_STATUS, Origins, Route, render, route};
 use crate::ip::rate_key;
 use crate::maybe_send::{MaybeSend, MaybeSync};
 use crate::preview::preview;
@@ -261,6 +261,14 @@ pub async fn handle<R: Runtime>(
             ),
         }
     };
+    // `corx-cache` is diagnostic only: stamped on the outgoing response
+    // the lookup produced, never inside `cached` — stored entries and
+    // early rejections carry none.
+    if let Some(cache) = cache {
+        response
+            .headers_mut()
+            .insert(CACHE_STATUS, HeaderValue::from_static(cache.as_str()));
+    }
     origins.apply(req.origin, response.headers_mut());
     let record = Record {
         outcome,
@@ -585,6 +593,69 @@ mod tests {
             assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
         }
         assert_eq!(rt2.calls(), 2);
+    }
+
+    #[test]
+    fn corx_cache_marks_miss_then_hit_never_stored() {
+        let (rt, origins, _) = fixture();
+        let method = Method::GET;
+        let uri: Uri = URI.parse().expect("uri");
+        let (res, _) =
+            futures_executor::block_on(handle(&rt, &origins, incoming(&method, &uri, None, None)));
+        assert_eq!(res.headers().get(CACHE_STATUS).expect("corx-cache"), "miss");
+        let stored = rt
+            .cache
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get("https://a.com/")
+            .cloned()
+            .expect("stored entry");
+        assert!(
+            stored.headers().get(CACHE_STATUS).is_none(),
+            "the stamp must not be stored"
+        );
+
+        let (res2, _) =
+            futures_executor::block_on(handle(&rt, &origins, incoming(&method, &uri, None, None)));
+        assert_eq!(res2.headers().get(CACHE_STATUS).expect("corx-cache"), "hit");
+    }
+
+    #[test]
+    fn corx_cache_absent_before_the_lookup() {
+        let (rt, origins, _) = fixture();
+        let method = Method::GET;
+        // invalid_url — routing rejects before the cache lookup.
+        let bad: Uri = "https://svc/v1/preview?url=ftp%3A%2F%2Fx"
+            .parse()
+            .expect("uri");
+        let (invalid, _) =
+            futures_executor::block_on(handle(&rt, &origins, incoming(&method, &bad, None, None)));
+        assert!(invalid.headers().get(CACHE_STATUS).is_none());
+
+        // client rate limit — admission rejects before the lookup.
+        rt.deny(Bucket::Client, "203.0.115.9", 7);
+        let uri: Uri = URI.parse().expect("uri");
+        let (denied, _) = futures_executor::block_on(handle(
+            &rt,
+            &origins,
+            incoming(
+                &method,
+                &uri,
+                None,
+                Some(IpAddr::V4(Ipv4Addr::new(203, 0, 115, 9))),
+            ),
+        ));
+        assert!(denied.headers().get(CACHE_STATUS).is_none());
+
+        // preflight — no lookup at all.
+        let options = Method::OPTIONS;
+        let preflight: Uri = "https://svc/v1/preview".parse().expect("uri");
+        let (no_content, _) = futures_executor::block_on(handle(
+            &rt,
+            &origins,
+            incoming(&options, &preflight, None, None),
+        ));
+        assert!(no_content.headers().get(CACHE_STATUS).is_none());
     }
 
     #[test]

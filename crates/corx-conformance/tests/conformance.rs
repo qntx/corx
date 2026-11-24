@@ -7,7 +7,8 @@
 //! add freely, every response must carry precisely the expected set — each
 //! name once, with precisely the expected value. No case needs the public
 //! web; the only targets ever fetched upstream are `example.invalid`
-//! requests whose status is never asserted.
+//! requests (sent twice where the cache verdict is observed) whose status
+//! is never asserted.
 
 #![allow(
     clippy::unwrap_used,
@@ -288,6 +289,27 @@ async fn head_matches_get() {
         expect_headers(&res, &error_headers(&[]));
         let body = res.text().await.expect("body");
         assert_eq!(body, "", "HEAD must not carry a body");
+    }
+}
+
+/// A request reaching the cache lookup is stamped `corx-cache: miss`;
+/// the diagnostic is never stored, so the repeat request misses again
+/// (`example.invalid` is uncacheable whichever error the edition
+/// renders). Rejects proven by the cases above never reach the lookup.
+#[tokio::test]
+#[ignore = "black-box: run via crates/corx-conformance/run.sh"]
+async fn cache_status_stamped_after_lookup() {
+    let ip = unique_ip();
+    let path = format!("/v1/preview?url={DEAD_TARGET}");
+    for _ in 0..2 {
+        let res = send(reqwest::Method::GET, &path, Some(ALLOWED_ORIGIN), &ip).await;
+        expect_headers(
+            &res,
+            &error_headers(&[
+                ("access-control-allow-origin", ALLOWED_ORIGIN),
+                ("corx-cache", "miss"),
+            ]),
+        );
     }
 }
 

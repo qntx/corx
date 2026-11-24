@@ -43,6 +43,9 @@ the HTTP contract of the preview endpoint.
   `corpus/ua-sweep.sh` and the weekly advisory corpus workflow (#64).
 - cargo-fuzz targets (`extract`, `target`) in an isolated `fuzz/`
   workspace plus a PR job and a daily scheduled workflow (#65).
+- Diagnostic response header `corx-cache: hit|miss`, stamped after the
+  cache lookup and never stored; it is absent on responses produced
+  before the lookup and is not part of the versioned contract.
 
 ### Fixed
 

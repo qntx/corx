@@ -19,6 +19,13 @@ const ALLOW_METHODS: &str = "GET, HEAD, OPTIONS";
 /// on uncacheable responses).
 pub const RENDERED_HEADERS: [HeaderName; 3] = [CONTENT_TYPE, CACHE_CONTROL, X_CONTENT_TYPE_OPTIONS];
 
+/// Diagnostic header stamped after the cache lookup: `hit` or `miss`.
+///
+/// Like CORS it is applied to the outgoing response only — never stored,
+/// not part of `RENDERED_HEADERS`, and not part of the versioned
+/// contract.
+pub const CACHE_STATUS: HeaderName = HeaderName::from_static("corx-cache");
+
 /// What a request routed to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Route {

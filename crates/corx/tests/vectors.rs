@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use corx::http::Origins;
-use corx::service::{self, Admission, Bucket, Cached, Fresh, Incoming, Runtime};
+use corx::service::{self, Admission, Bucket, CacheStatus, Cached, Fresh, Incoming, Runtime};
 use corx::{Fetch, FetchError};
 use futures_util::stream::{self, Stream};
 use http::{HeaderName, HeaderValue, Method, StatusCode, Uri};
@@ -349,12 +349,26 @@ fn run_vector(vector: &Value) -> Result<(), String> {
         origin: origin.as_ref(),
         client_ip: None,
     };
-    let (res, _record) = futures_executor::block_on(service::handle(&rt, &origins, incoming));
+    let (res, record) = futures_executor::block_on(service::handle(&rt, &origins, incoming));
 
     let expect = vector
         .get("expect")
         .ok_or_else(|| "vector needs expect".to_owned())?;
     let mut problems: Vec<String> = Vec::new();
+
+    // `corx-cache` is stamped after the cache lookup: it must be present
+    // iff the request reached it (`record.cache`), never earlier, never
+    // stored. Vectors do not list it — it is diagnostic, not contract.
+    match (
+        res.headers()
+            .get(corx::http::CACHE_STATUS)
+            .and_then(|v| v.to_str().ok()),
+        record.cache.map(CacheStatus::as_str),
+    ) {
+        (None, None) => {}
+        (Some(got), Some(want)) if got == want => {}
+        (got, want) => problems.push(format!("corx-cache: got {got:?}, want {want:?}")),
+    }
 
     if let Some(status) = expect.get("status").and_then(Value::as_u64)
         && u64::from(res.status().as_u16()) != status
