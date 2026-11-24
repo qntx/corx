@@ -24,6 +24,10 @@ the HTTP contract of the preview endpoint.
 - `Fetch::get` takes the `Accept` value as a parameter (#63).
 - Rust 1.100 toolchain; worker 0.9.0, worker-build 0.9.0, wrangler
   4.164.0 and `compatibility_date` 2026-11-17; version bump to 0.4.0.
+- `upstream_status` responses are cached (`max-age=3600`) only when the
+  upstream answered a 4xx other than 408/429; 1xx, unfollowed 3xx, 408,
+  429 and every 5xx are now `no-store` — a transient or rate-limit
+  answer no longer pins a target to an hour of failures.
 
 ### Added
 

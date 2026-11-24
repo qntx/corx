@@ -125,12 +125,19 @@ impl Error {
     }
 
     /// Whether a negative result is safe to store in a shared cache.
+    ///
+    /// `upstream_status` is cacheable only for a 4xx other than 408/429:
+    /// a client-side refusal is stable, while 1xx, an unfollowed 3xx,
+    /// rate limits, timeouts and 5xx answers are transient.
     #[must_use]
     pub const fn is_cacheable(self) -> bool {
-        matches!(
-            self,
-            Self::NoMetadata | Self::RedirectFailed | Self::UpstreamStatus(_)
-        )
+        match self {
+            Self::NoMetadata | Self::RedirectFailed => true,
+            Self::UpstreamStatus(status) => {
+                matches!(status.as_u16(), 400..=499) && !matches!(status.as_u16(), 408 | 429)
+            }
+            _ => false,
+        }
     }
 }
 
@@ -165,6 +172,48 @@ mod tests {
                 422,
                 "upstream_status",
                 true,
+            ),
+            (
+                Error::UpstreamStatus(StatusCode::NOT_FOUND),
+                422,
+                "upstream_status",
+                true,
+            ),
+            (
+                Error::UpstreamStatus(StatusCode::GONE),
+                422,
+                "upstream_status",
+                true,
+            ),
+            (
+                Error::UpstreamStatus(StatusCode::NOT_MODIFIED),
+                422,
+                "upstream_status",
+                false,
+            ),
+            (
+                Error::UpstreamStatus(StatusCode::REQUEST_TIMEOUT),
+                422,
+                "upstream_status",
+                false,
+            ),
+            (
+                Error::UpstreamStatus(StatusCode::TOO_MANY_REQUESTS),
+                422,
+                "upstream_status",
+                false,
+            ),
+            (
+                Error::UpstreamStatus(StatusCode::INTERNAL_SERVER_ERROR),
+                422,
+                "upstream_status",
+                false,
+            ),
+            (
+                Error::UpstreamStatus(StatusCode::SERVICE_UNAVAILABLE),
+                422,
+                "upstream_status",
+                false,
             ),
             (Error::RateLimited, 429, "rate_limited", false),
             (

@@ -124,7 +124,7 @@ appears on any other error.
 | 413 | `too_large` | HTML exceeded 1 MiB before `</head>` | no | |
 | 415 | `unsupported_content` | `Content-Type` missing or unparseable | no | |
 | 422 | `redirect_failed` | a followed 3xx had a missing, non-ASCII or unparseable `Location`, a `Location` resolving to a non-http(s) URL, credentials, an explicit port or more than 2048 bytes after normalization, or the chain exceeded 5 hops | yes (`max-age=3600`) | |
-| 422 | `upstream_status` | the final hop answered a non-2xx, non-followed status | yes (`max-age=3600`) | `upstreamStatus` in the body |
+| 422 | `upstream_status` | the final hop answered a non-2xx, non-followed status | only a 4xx other than 408/429 (`max-age=3600`) | `upstreamStatus` in the body |
 | 429 | `rate_limited` | client or per-host limit exceeded | no | `Retry-After` (seconds, ≥ 1) |
 | 502 | `upstream_unreachable` | the target could not be reached | no | |
 | 503 | `overloaded` | the deployment is shedding load | no | |
@@ -136,7 +136,9 @@ responses carry it too.
 ## `Cache-Control`
 
 - success: `public, max-age=86400, stale-while-revalidate=604800`
-- `no_metadata`, `redirect_failed` and `upstream_status`: `public, max-age=3600`
+- `no_metadata` and `redirect_failed`: `public, max-age=3600`
+- `upstream_status`: `public, max-age=3600` when the upstream status is
+  a 4xx other than 408 or 429; `no-store` otherwise
 - every other error: `no-store`
 
 ## Limits and upstream behaviour

@@ -588,6 +588,41 @@ mod tests {
     }
 
     #[test]
+    fn upstream_4xx_cached_transient_statuses_not() {
+        let (mut rt, origins, _) = fixture();
+        let method = Method::GET;
+        let uri: Uri = URI.parse().expect("uri");
+
+        // 429 is transient: both requests miss and refetch.
+        let mut too_many = http::Response::new(Vec::new());
+        *too_many.status_mut() = StatusCode::TOO_MANY_REQUESTS;
+        rt.fetcher.routes.insert("https://a.com/".into(), too_many);
+        for _ in 0..2 {
+            let (res, rec) = futures_executor::block_on(handle(
+                &rt,
+                &origins,
+                incoming(&method, &uri, None, None),
+            ));
+            assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            assert_eq!(rec.cache, Some(CacheStatus::Miss));
+        }
+        assert_eq!(rt.calls(), 2);
+
+        // 404 is definitive: the next request misses once, then hits.
+        let mut missing = http::Response::new(Vec::new());
+        *missing.status_mut() = StatusCode::NOT_FOUND;
+        rt.fetcher.routes.insert("https://a.com/".into(), missing);
+        let (res, _) =
+            futures_executor::block_on(handle(&rt, &origins, incoming(&method, &uri, None, None)));
+        assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let (res2, rec2) =
+            futures_executor::block_on(handle(&rt, &origins, incoming(&method, &uri, None, None)));
+        assert_eq!(res2.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(rec2.outcome, "cached");
+        assert_eq!(rt.calls(), 3);
+    }
+
+    #[test]
     fn timeout_is_504_and_not_cached() {
         let (mut rt, origins, _) = fixture();
         rt.fetcher.hang_after = 0;
