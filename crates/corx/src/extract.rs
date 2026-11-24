@@ -301,16 +301,12 @@ fn on_head(state: &Arc<Mutex<Inner>>) -> Handler {
     let st = Arc::clone(state);
     element!("head", move |el: &mut Element<'_, '_, _>| {
         let st2 = Arc::clone(&st);
-        if el
-            .on_end_tag(end_tag!(move |_: &mut EndTag<'_>| {
-                lock(&st2).done = true;
-                Ok(())
-            }))
-            .is_err()
-        {
-            // A self-closing <head/> has no end tag; head-end detection
-            // falls back to the first <body> start or the byte cap.
-        }
+        // A self-closing <head/> has no end tag; head-end detection
+        // falls back to the first <body> start or the byte cap.
+        let _end_tag = el.on_end_tag(end_tag!(move |_: &mut EndTag<'_>| {
+            lock(&st2).done = true;
+            Ok(())
+        }));
         Ok(())
     })
 }
