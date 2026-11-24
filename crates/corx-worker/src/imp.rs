@@ -168,10 +168,14 @@ struct WorkerFetch {
 impl Fetch for WorkerFetch {
     type Body = Pin<Box<dyn Stream<Item = Result<Bytes, FetchError>>>>;
 
-    async fn get(&self, url: &Url) -> Result<http::Response<Self::Body>, FetchError> {
+    async fn get(
+        &self,
+        url: &Url,
+        accept: &'static str,
+    ) -> Result<http::Response<Self::Body>, FetchError> {
         let headers = Headers::new();
         let ok = headers.set("user-agent", &self.user_agent).is_ok()
-            && headers.set("accept", corx::ACCEPT).is_ok();
+            && headers.set("accept", accept).is_ok();
         if !ok {
             return Err(FetchError::Unreachable);
         }
@@ -321,6 +325,7 @@ async fn handle(req: Request, env: Env, ctx: Context) -> worker::Result<Response
         "target_fingerprint": record.target_fingerprint,
         "upstream_status": record.upstream_status.map(|s| s.as_u16()),
         "hops": record.hops,
+        "oembed_status": record.oembed_status.map(|s| s.as_u16()),
     });
     console_log!("{line}");
     to_worker(&res)

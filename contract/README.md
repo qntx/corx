@@ -73,9 +73,23 @@ truncated — an over-long or unresolvable URL is dropped instead. A page
 must yield a `title` or an `image`; anything less is
 `404 no_metadata`.
 
-`source` is `"html"` today: the metadata was extracted from the target's
-own HTML head. `"oembed"` is part of the contract and will mark previews
-resolved through an oEmbed endpoint.
+`source` is `"html"` when the metadata was extracted from the target's
+own HTML head. `"oembed"` marks a preview resolved through a provider's
+oEmbed endpoint: when the final HTML hop's host has a registered oEmbed
+provider — currently `reddit.com` and `tiktok.com`, including their
+subdomains — and the HTML outcome is an `upstream_status` error, a
+`no_metadata` error, or a page with neither `description` nor `image`,
+the service makes exactly one `GET` to the provider's oEmbed endpoint
+(`<endpoint>?url=<finalUrl>&format=json`). That request sends
+`Accept: application/json`, follows no redirects, reads at most 64 KiB,
+and must return a 2xx JSON body — any other outcome keeps the original
+result unchanged. Of the oEmbed fields, `title` → `title`,
+`author_name` → `description`, `provider_name` → `siteName`, and
+`thumbnail_url` (resolved against the endpoint URL) + `thumbnail_width` /
+`thumbnail_height` (numbers or numeric strings) → `image`; the `html`
+field is never read, and an oEmbed page that would yield neither `title`
+nor `image` is discarded. The exchange runs inside the same 6 s
+budget as the HTML pipeline.
 
 ### `kind: "media"`
 
@@ -129,7 +143,8 @@ responses carry it too.
 - Target URL ≤ 2048 bytes; at most 5 redirects; ≤ 1 MiB of HTML is read.
 - Upstream connect deadline 3 s; total preview budget 6 s.
 - Upstream requests send a single deployment-configured `User-Agent` and
-  `Accept: text/html,application/xhtml+xml`, never cookies. Redirects are
+  never cookies. `Accept` is `text/html,application/xhtml+xml` on HTML
+  hops and `application/json` on the oEmbed exchange. Redirects are
   followed by the service itself, not the HTTP stack, so every hop is
   re-validated against the target rules — an `https` → `http` downgrade
   or a hop to a private/literal address is refused.

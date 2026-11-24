@@ -113,7 +113,7 @@ fn meta<'m>(md: &'m Metadata, keys: &[&str]) -> Option<&'m str> {
 
 /// Resolves `raw` against `base`; keeps only http(s) URLs within
 /// `MAX_URL_LEN`.
-fn resolve(raw: &str, base: &Url) -> Option<String> {
+pub(crate) fn resolve(raw: &str, base: &Url) -> Option<String> {
     let url = base.join(raw).ok()?;
     if matches!(url.scheme(), "http" | "https") && url.as_str().len() <= MAX_URL_LEN {
         Some(String::from(url.as_str()))
@@ -131,6 +131,8 @@ pub struct Trace {
     pub hops: u8,
     /// Status of the last upstream response received, if any.
     pub upstream_status: Option<::http::StatusCode>,
+    /// Status of the oEmbed response, if the fallback ran and one arrived.
+    pub oembed_status: Option<::http::StatusCode>,
 }
 
 fn is_redirect(status: ::http::StatusCode) -> bool {
@@ -164,8 +166,11 @@ pub async fn preview<F: Fetch>(
 ) -> Result<Preview, Error> {
     let original = target.as_str().to_owned();
     let mut current = target;
-    loop {
-        let response = fetch.get(current.as_url()).await?;
+    let result: Result<Preview, Error> = loop {
+        let response = match fetch.get(current.as_url(), crate::ACCEPT_HTML).await {
+            Ok(res) => res,
+            Err(e) => break Err(e.into()),
+        };
         trace.upstream_status = Some(response.status());
         if is_redirect(response.status()) {
             trace.hops = trace.hops.saturating_add(1);
@@ -174,16 +179,19 @@ pub async fn preview<F: Fetch>(
                 .get(::http::header::LOCATION)
                 .and_then(|v| v.to_str().ok())
             else {
-                return Err(Error::RedirectFailed);
+                break Err(Error::RedirectFailed);
             };
             if usize::from(trace.hops) > MAX_REDIRECTS {
-                return Err(Error::RedirectFailed);
+                break Err(Error::RedirectFailed);
             }
-            current = current.redirect(location)?;
+            match current.redirect(location) {
+                Ok(next) => current = next,
+                Err(e) => break Err(e),
+            }
             continue;
         }
         if !response.status().is_success() {
-            return Err(Error::UpstreamStatus(response.status()));
+            break Err(Error::UpstreamStatus(response.status()));
         }
         let content_type = response
             .headers()
@@ -194,26 +202,30 @@ pub async fn preview<F: Fetch>(
             .as_deref()
             .and_then(|ct| ct.parse::<mime::Mime>().ok());
         let Some(mime) = mime else {
-            return Err(Error::UnsupportedContent);
+            break Err(Error::UnsupportedContent);
         };
         if mime.essence_str() == "text/html" || mime.essence_str() == "application/xhtml+xml" {
             let cs = mime.get_param(mime::CHARSET).map(|c| c.as_str().to_owned());
-            let md = drain(response.into_body(), cs.as_deref()).await?;
-            return build(&original, &current, md, now_unix_secs);
+            let md = match drain(response.into_body(), cs.as_deref()).await {
+                Ok(md) => md,
+                Err(e) => break Err(e),
+            };
+            break build(&original, &current, md, now_unix_secs);
         }
         // Not HTML: the resource itself is the preview — its body is never
         // read, so dropping the response closes the connection.
         let size = media_size(response.headers());
         let media = Preview::Media(Media {
-            url: original,
+            url: original.clone(),
             final_url: current.as_str().to_owned(),
             media_type: mime.essence_str().to_owned(),
             size,
             fetched_at: now_unix_secs,
         });
         drop(response);
-        return Ok(media);
-    }
+        break Ok(media);
+    };
+    crate::oembed::fallback(fetch, &original, &current, now_unix_secs, result, trace).await
 }
 
 /// `Content-Length` as `u64`, present only when the body is unencoded — an

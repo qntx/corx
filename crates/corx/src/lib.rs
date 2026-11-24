@@ -10,6 +10,7 @@ mod fetch;
 pub mod http;
 pub mod ip;
 mod maybe_send;
+mod oembed;
 mod preview;
 pub mod service;
 mod target;
@@ -42,8 +43,14 @@ pub const DEFAULT_USER_AGENT: &str = concat!(
     " (+https://github.com/qntx/corx)"
 );
 
-/// `Accept` header sent upstream.
-pub const ACCEPT: &str = "text/html,application/xhtml+xml";
+/// `Accept` sent on HTML hops.
+pub const ACCEPT_HTML: &str = "text/html,application/xhtml+xml";
+
+/// `Accept` sent on the oEmbed exchange.
+pub const ACCEPT_JSON: &str = "application/json";
+
+/// Maximum oEmbed response body read, in bytes.
+pub const MAX_OEMBED_BYTES: usize = 64 * 1024;
 
 /// `Cache-Control` emitted for a successful preview.
 pub const CACHE_CONTROL_SUCCESS: &str = "public, max-age=86400, stale-while-revalidate=604800";

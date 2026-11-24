@@ -154,6 +154,9 @@ pub struct Record {
     /// Redirect responses received on a miss ([`crate::Trace::hops`]);
     /// `None` for cache hits, rejects and preflights.
     pub hops: Option<u8>,
+    /// oEmbed response status, if the fallback ran
+    /// ([`crate::Trace::oembed_status`]).
+    pub oembed_status: Option<StatusCode>,
 }
 
 /// Renders a rate-limit denial: `429` plus `Retry-After` (at least one
@@ -267,6 +270,7 @@ pub async fn handle<R: Runtime>(
         target_fingerprint: target.map(|(_, fingerprint)| fingerprint),
         upstream_status: trace.and_then(|t| t.upstream_status),
         hops: trace.map(|t| t.hops),
+        oembed_status: trace.and_then(|t| t.oembed_status),
     };
     (response, record)
 }
@@ -303,6 +307,7 @@ mod tests {
         fn get(
             &self,
             url: &Url,
+            _accept: &'static str,
         ) -> impl Future<Output = Result<http::Response<Self::Body>, FetchError>> + Send {
             if self.calls.fetch_add(1, Ordering::Relaxed) >= self.hang_after {
                 return Either::Left(std::future::pending());

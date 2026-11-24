@@ -8,6 +8,7 @@
   "upstream": [
     {
       "url": "https://a.example/",
+      "accept": "text/html,application/xhtml+xml",
       "status": 302,
       "headers": {
         "location": "/b"

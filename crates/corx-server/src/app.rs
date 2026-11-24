@@ -122,6 +122,7 @@ async fn preview<F: Fetch>(
         target_fingerprint = record.target_fingerprint.as_deref().unwrap_or("n/a"),
         upstream_status = record.upstream_status.map(|s| s.as_u16()),
         hops = record.hops,
+        oembed_status = record.oembed_status.map(|s| s.as_u16()),
         "request"
     );
     res.map(Body::from)
@@ -175,7 +176,11 @@ mod tests {
     impl Fetch for Fake {
         type Body = FakeBody;
 
-        async fn get(&self, _url: &Url) -> Result<http::Response<Self::Body>, corx::FetchError> {
+        async fn get(
+            &self,
+            _url: &Url,
+            _accept: &'static str,
+        ) -> Result<http::Response<Self::Body>, corx::FetchError> {
             self.0.calls.fetch_add(1, Ordering::Relaxed);
             if self.0.hang {
                 std::future::pending::<()>().await;

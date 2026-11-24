@@ -102,11 +102,15 @@ impl NativeFetch {
 impl corx::Fetch for NativeFetch {
     type Body = Body;
 
-    async fn get(&self, url: &Url) -> Result<http::Response<Self::Body>, corx::FetchError> {
+    async fn get(
+        &self,
+        url: &Url,
+        accept: &'static str,
+    ) -> Result<http::Response<Self::Body>, corx::FetchError> {
         let res = self
             .client
             .get(url.clone())
-            .header(header::ACCEPT, corx::ACCEPT)
+            .header(header::ACCEPT, accept)
             .send()
             .await
             .map_err(|e| map_reqwest(&e))?;
@@ -201,7 +205,10 @@ mod tests {
     async fn redirect_is_returned_not_followed() {
         let (addr, task) = spawn().await;
         let url = Url::parse(&format!("http://{addr}/redirect")).expect("url");
-        let res = fetch().get(&url).await.expect("response");
+        let res = fetch()
+            .get(&url, corx::ACCEPT_HTML)
+            .await
+            .expect("response");
         assert_eq!(res.status(), StatusCode::FOUND);
         assert_eq!(
             res.headers().get(header::LOCATION).expect("location"),
@@ -210,18 +217,24 @@ mod tests {
         task.abort();
     }
 
-    #[tokio::test]
-    async fn sends_user_agent_and_accept() {
-        let (addr, task) = spawn().await;
-        let url = Url::parse(&format!("http://{addr}/echo")).expect("url");
-        let res = fetch().get(&url).await.expect("response");
+    async fn echoed_headers(url: &Url, accept: &'static str) -> String {
+        let res = fetch().get(url, accept).await.expect("response");
         let mut body = res.into_body();
         let mut buf = Vec::new();
         while let Some(chunk) = body.next().await {
             buf.extend_from_slice(&chunk.expect("chunk"));
         }
-        let echoed = String::from_utf8(buf).expect("utf8");
-        assert_eq!(echoed, format!("corx-test/0.0.0|{}", corx::ACCEPT));
+        String::from_utf8(buf).expect("utf8")
+    }
+
+    #[tokio::test]
+    async fn sends_user_agent_and_accept() {
+        let (addr, task) = spawn().await;
+        let url = Url::parse(&format!("http://{addr}/echo")).expect("url");
+        for accept in [corx::ACCEPT_HTML, corx::ACCEPT_JSON] {
+            let echoed = echoed_headers(&url, accept).await;
+            assert_eq!(echoed, format!("corx-test/0.0.0|{accept}"));
+        }
         task.abort();
     }
 
@@ -229,7 +242,10 @@ mod tests {
     async fn gzip_body_is_decompressed() {
         let (addr, task) = spawn().await;
         let url = Url::parse(&format!("http://{addr}/gzip")).expect("url");
-        let res = fetch().get(&url).await.expect("response");
+        let res = fetch()
+            .get(&url, corx::ACCEPT_HTML)
+            .await
+            .expect("response");
         let mut body = res.into_body();
         let mut buf = Vec::new();
         while let Some(chunk) = body.next().await {
@@ -245,7 +261,7 @@ mod tests {
         // BlockedAddress → FetchError::Blocked.
         let url = Url::parse("http://localhost:9/").expect("url");
         assert_eq!(
-            fetch().get(&url).await.err(),
+            fetch().get(&url, corx::ACCEPT_HTML).await.err(),
             Some(corx::FetchError::Blocked)
         );
     }

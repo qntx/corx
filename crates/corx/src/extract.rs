@@ -14,9 +14,9 @@ use lol_html::{AsciiCompatibleEncoding, Selector, element, end_tag, send, text};
 
 use crate::MAX_URL_LEN;
 
-const MAX_TITLE_CHARS: usize = 300;
-const MAX_DESCRIPTION_CHARS: usize = 600;
-const MAX_SITE_NAME_CHARS: usize = 100;
+pub(crate) const MAX_TITLE_CHARS: usize = 300;
+pub(crate) const MAX_DESCRIPTION_CHARS: usize = 600;
+pub(crate) const MAX_SITE_NAME_CHARS: usize = 100;
 const MAX_ALT_CHARS: usize = 300;
 const MAX_KIND_CHARS: usize = 50;
 const MAX_LANG_CHARS: usize = 35;
@@ -104,7 +104,7 @@ fn is_done(state: &Mutex<Inner>) -> bool {
 
 /// Decodes HTML entities, collapses whitespace, trims; empty → `None`,
 /// longer than `max_chars` → truncated on a char boundary.
-fn clean_text(raw: &str, max_chars: usize) -> Option<String> {
+pub(crate) fn clean_text(raw: &str, max_chars: usize) -> Option<String> {
     let decoded = html_escape::decode_html_entities(raw);
     let collapsed = decoded.split_whitespace().collect::<Vec<_>>().join(" ");
     (!collapsed.is_empty()).then(|| collapsed.chars().take(max_chars).collect())
@@ -113,7 +113,7 @@ fn clean_text(raw: &str, max_chars: usize) -> Option<String> {
 /// Decodes HTML entities and trims; empty or longer than `MAX_URL_LEN` bytes
 /// → `None`. URLs are never truncated: a cut-off URL would still parse but
 /// point somewhere wrong.
-fn clean_url(raw: &str) -> Option<String> {
+pub(crate) fn clean_url(raw: &str) -> Option<String> {
     let decoded = html_escape::decode_html_entities(raw);
     let trimmed = decoded.trim();
     (!trimmed.is_empty() && trimmed.len() <= MAX_URL_LEN).then(|| (*trimmed).to_owned())

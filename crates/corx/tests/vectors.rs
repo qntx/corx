@@ -45,7 +45,11 @@ struct ScriptedFetch {
 }
 
 impl ScriptedFetch {
-    fn next(&self, url: &Url) -> Result<http::Response<Body>, FetchError> {
+    fn next(
+        &self,
+        url: &Url,
+        got_accept: &'static str,
+    ) -> Result<http::Response<Body>, FetchError> {
         let mut problems = self
             .problems
             .lock()
@@ -66,13 +70,12 @@ impl ScriptedFetch {
             ));
             return Err(FetchError::Unreachable);
         }
-        // The `Fetch` port passes only the URL, so a hop's `accept` cannot be
-        // observed here; asserting it equals the constant adapters send keeps
-        // the fixture honest until the port can carry it.
+        // A hop's declared `accept` is checked against what `preview`
+        // actually passed for that fetch.
         if let Some(accept) = accept
-            && accept != corx::ACCEPT
+            && accept != got_accept
         {
-            problems.push(format!("hop accept {accept:?} is not corx::ACCEPT"));
+            problems.push(format!("hop accept {accept:?} != sent {got_accept:?}"));
             return Err(FetchError::Unreachable);
         }
         drop(problems);
@@ -93,8 +96,9 @@ impl Fetch for ScriptedFetch {
     fn get(
         &self,
         url: &Url,
+        accept: &'static str,
     ) -> impl Future<Output = Result<http::Response<Self::Body>, FetchError>> + Send {
-        std::future::ready(self.next(url))
+        std::future::ready(self.next(url, accept))
     }
 }
 

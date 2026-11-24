@@ -1,0 +1,42 @@
+{
+  "description": "a 403 from tiktok falls back to oEmbed; string dims become integers",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fwww.tiktok.com%2F%40user%2Fvideo%2F123"
+  },
+  "upstream": [
+    {
+      "url": "https://www.tiktok.com/@user/video/123",
+      "status": 403
+    },
+    {
+      "url": "https://www.tiktok.com/oembed?url=https%3A%2F%2Fwww.tiktok.com%2F%40user%2Fvideo%2F123&format=json",
+      "accept": "application/json",
+      "status": 200,
+      "body": "{\"title\":\"cool dance\",\"author_name\":\"@user\",\"provider_name\":\"TikTok\",\"thumbnail_url\":\"https://cdn.example.com/t.jpg\",\"thumbnail_width\":\"720\",\"thumbnail_height\":\"1280\",\"html\":\"<iframe/>\"}"
+    }
+  ],
+  "expect": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800"
+    },
+    "body": {
+      "kind": "page",
+      "url": "https://www.tiktok.com/@user/video/123",
+      "finalUrl": "https://www.tiktok.com/@user/video/123",
+      "fetchedAt": 1700000000,
+      "source": "oembed",
+      "title": "cool dance",
+      "description": "@user",
+      "siteName": "TikTok",
+      "image": {
+        "url": "https://cdn.example.com/t.jpg",
+        "width": 720,
+        "height": 1280
+      }
+    }
+  }
+}

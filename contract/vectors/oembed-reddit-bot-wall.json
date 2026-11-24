@@ -1,0 +1,41 @@
+{
+  "description": "a title-only bot-wall page on reddit falls back to oEmbed",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fwww.reddit.com%2Fr%2Frust%2Fcomments%2Fabc123%2Fhello%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://www.reddit.com/r/rust/comments/abc123/hello/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body": "<html><head><title>Reddit</title></head><body></body></html>"
+    },
+    {
+      "url": "https://www.reddit.com/oembed?url=https%3A%2F%2Fwww.reddit.com%2Fr%2Frust%2Fcomments%2Fabc123%2Fhello%2F&format=json",
+      "accept": "application/json",
+      "status": 200,
+      "body": "{\"title\":\"Hello, world post\",\"author_name\":\"alice\",\"provider_name\":\"reddit\"}"
+    }
+  ],
+  "expect": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800"
+    },
+    "body": {
+      "kind": "page",
+      "url": "https://www.reddit.com/r/rust/comments/abc123/hello/",
+      "finalUrl": "https://www.reddit.com/r/rust/comments/abc123/hello/",
+      "fetchedAt": 1700000000,
+      "source": "oembed",
+      "title": "Hello, world post",
+      "description": "alice",
+      "siteName": "reddit"
+    }
+  }
+}

@@ -8,6 +8,7 @@
   "upstream": [
     {
       "url": "https://a.example/",
+      "accept": "text/html,application/xhtml+xml",
       "status": 200,
       "headers": {
         "content-type": "text/html"
@@ -27,7 +28,7 @@
       "finalUrl": "https://a.example/",
       "source": "html",
       "fetchedAt": 1700000000,
-      "title": "Caf\u00e9 & Bar",
+      "title": "Café & Bar",
       "description": "Tom & Jerry"
     }
   }

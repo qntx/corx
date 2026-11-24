@@ -40,6 +40,9 @@ These are the rules reviewers enforce:
   cache) and convert types — nothing else.
 - Every redirect hop goes through `Target::redirect` — never follow a
   `Location` blindly.
+- The oEmbed fallback request is built with `Target::parse` and sent
+  through the same `Fetch` port as any other upstream hop — same
+  validation, same headers discipline.
 - Native DNS answers are filtered by `ip::is_public` before connecting (no
   TOCTOU), and the HTTP client ignores proxies. The Worker relies on the
   `global_fetch_strictly_public` compatibility flag instead.

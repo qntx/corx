@@ -33,7 +33,7 @@ impl From<FetchError> for Error {
 /// One `GET` against an already-validated URL.
 ///
 /// Implementations must never follow redirects, must send `User-Agent` and
-/// `Accept: ACCEPT`, must not send cookies, and must transparently decompress.
+/// `Accept: accept`, must not send cookies, and must transparently decompress.
 pub trait Fetch: MaybeSync {
     /// Body stream for the response.
     type Body: Stream<Item = Result<Bytes, FetchError>> + Unpin + MaybeSend;
@@ -42,5 +42,6 @@ pub trait Fetch: MaybeSync {
     fn get(
         &self,
         url: &Url,
+        accept: &'static str,
     ) -> impl Future<Output = Result<::http::Response<Self::Body>, FetchError>> + MaybeSend;
 }

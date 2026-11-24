@@ -1,0 +1,34 @@
+{
+  "description": "a reddit page with title and description never asks oEmbed",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fwww.reddit.com%2Fr%2Frust%2Fcomments%2Fabc123%2Fhello%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://www.reddit.com/r/rust/comments/abc123/hello/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body": "<html><head><title>Real post</title><meta name=\"description\" content=\"A real description\"></head><body></body></html>"
+    }
+  ],
+  "expect": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800"
+    },
+    "body": {
+      "kind": "page",
+      "url": "https://www.reddit.com/r/rust/comments/abc123/hello/",
+      "finalUrl": "https://www.reddit.com/r/rust/comments/abc123/hello/",
+      "fetchedAt": 1700000000,
+      "source": "html",
+      "title": "Real post",
+      "description": "A real description"
+    }
+  }
+}
