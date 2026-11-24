@@ -27,6 +27,7 @@ crates/corx-server/       the `corx` binary: axum + reqwest + governor + moka
 crates/corx-worker/       Cloudflare Worker adapter (workers-rs, cdylib) and wrangler.jsonc
 contract/                 the HTTP contract: prose, JSON schema, golden vectors
 corpus/                   the URL corpus list + the UA-sweep script
+fuzz/                     cargo-fuzz targets (own workspace; corpus not committed)
 Dockerfile                multi-stage cargo-chef image (distroless runtime)
 .github/                  CI, release, docker and dependabot workflows
 ```
@@ -144,6 +145,19 @@ with `198.18.0.0/15` addresses, which corx correctly rejects as reserved.
   native server rejects every target — run `wrangler dev --local` and point
   the tool at the Worker for Worker-code numbers (measuring this machine's
   egress, not Cloudflare's), or use the workflow for native numbers.
+
+## Fuzzing
+
+`fuzz/` is an isolated cargo-fuzz workspace with two targets: `extract`
+(the same HTML must extract the same preview regardless of body
+chunking, across charsets) and `target` (`Target::parse` normalization is
+a fixed point, redirects keep scheme rules). They run through the public
+API only — no `cfg(fuzzing)` hooks. The `fuzz` CI job runs both for 60 s
+per pull request on the pinned nightly; the daily `fuzz.yml` workflow
+runs 15 minutes. Crash artifacts land under `fuzz/artifacts/` and the
+generated corpus under `fuzz/corpus/` — neither is committed. On Apple
+Silicon pass `--target aarch64-apple-darwin` (cargo-fuzz defaults to
+x86_64).
 
 ## Dependencies
 

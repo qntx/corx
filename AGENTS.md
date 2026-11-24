@@ -39,4 +39,10 @@ Run the URL corpus against a deployment (reports only, never gates):
 just corpus <base-url>
 ```
 
+Fuzz one target locally (needs the pinned nightly toolchain and cargo-fuzz):
+
+```bash
+cargo +"$(cat .github/nightly-toolchain)" fuzz run <target> --target aarch64-apple-darwin -- -max_total_time=60
+```
+
 TOML is formatted by taplo (`.taplo.toml`, aligned `=`); keep `taplo fmt --check` green.

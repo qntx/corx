@@ -1,0 +1,38 @@
+[package]
+name    = "corx-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys    = { version = "0.4.13", features = ["arbitrary-derive"] }
+arbitrary        = "1.5"
+futures-executor = "0.3.34"
+futures-util     = "0.3.34"
+bytes            = "1.12"
+http             = "1.5"
+url              = "2.5.8"
+
+[dependencies.corx]
+path = "../crates/corx"
+
+# Isolated from the parent workspace so the main gates never see libFuzzer.
+[workspace]
+members = ["."]
+
+[[bin]]
+name  = "extract"
+path  = "fuzz_targets/extract.rs"
+test  = false
+doc   = false
+bench = false
+
+[[bin]]
+name  = "target"
+path  = "fuzz_targets/target.rs"
+test  = false
+doc   = false
+bench = false
