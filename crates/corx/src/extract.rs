@@ -187,14 +187,31 @@ fn on_title(state: &Arc<Mutex<Inner>>) -> Handler {
             g.collecting_title = true;
         }
         let st2 = Arc::clone(&st);
-        el.on_end_tag(end_tag!(move |_: &mut EndTag<'_>| {
-            let mut g = lock(&st2);
+        if el
+            .on_end_tag(end_tag!(move |_: &mut EndTag<'_>| {
+                let mut g = lock(&st2);
+                if g.done {
+                    // Every handler stops at done so the result is
+                    // independent of chunk boundaries.
+                    g.collecting_title = false;
+                    g.title_buf.clear();
+                    return Ok(());
+                }
+                g.collecting_title = false;
+                let raw = std::mem::take(&mut g.title_buf);
+                g.title = clean_text(&raw, MAX_TITLE_CHARS);
+                drop(g);
+                Ok(())
+            }))
+            .is_err()
+        {
+            // A self-closing <title/> has no end tag to observe; undo the
+            // collection state so a later real <title> still counts.
+            let mut g = lock(&st);
             g.collecting_title = false;
-            let raw = std::mem::take(&mut g.title_buf);
-            g.title = clean_text(&raw, MAX_TITLE_CHARS);
-            drop(g);
-            Ok(())
-        }))
+            g.title_seen = false;
+        }
+        Ok(())
     })
 }
 
@@ -284,10 +301,17 @@ fn on_head(state: &Arc<Mutex<Inner>>) -> Handler {
     let st = Arc::clone(state);
     element!("head", move |el: &mut Element<'_, '_, _>| {
         let st2 = Arc::clone(&st);
-        el.on_end_tag(end_tag!(move |_: &mut EndTag<'_>| {
-            lock(&st2).done = true;
-            Ok(())
-        }))
+        if el
+            .on_end_tag(end_tag!(move |_: &mut EndTag<'_>| {
+                lock(&st2).done = true;
+                Ok(())
+            }))
+            .is_err()
+        {
+            // A self-closing <head/> has no end tag; head-end detection
+            // falls back to the first <body> start or the byte cap.
+        }
+        Ok(())
     })
 }
 
@@ -349,6 +373,10 @@ impl Extractor {
         if let Some(rewriter) = self.rewriter.as_mut() {
             if rewriter.write(chunk).is_err() {
                 lock(&self.state).done = true;
+                // RewritingErrors are unrecoverable: lol_html panics when
+                // a poisoned rewriter is used again, so drop it to keep
+                // finish() from calling end() on it.
+                self.rewriter = None;
             }
         } else {
             lock(&self.state).done = true;
@@ -549,14 +577,55 @@ mod tests {
         assert_eq!(meta(&md, "description").map(str::len), Some(600));
     }
 
+    /// A `<body>` inside a title: `done` fires mid-title, so whether the
+    /// late `</title>` commit runs used to depend on chunk boundaries.
+    const DONE_INSIDE_TITLE: &str =
+        "<svg/><title>x<body></title><meta property=\"og:title\" content=\"late\">";
+
     #[test]
     fn identical_at_every_split_point() {
-        let bytes = FULL.as_bytes();
-        let want = run(&[bytes], None);
-        for i in 1..bytes.len() {
-            let (head, tail) = bytes.split_at(i);
-            let parts: [&[u8]; 2] = (head, tail).into();
-            assert_eq!(run(&parts, None), want, "split at byte {i}");
+        for doc in [FULL, DONE_INSIDE_TITLE] {
+            let bytes = doc.as_bytes();
+            let want = run(&[bytes], None);
+            for i in 1..bytes.len() {
+                let (head, tail) = bytes.split_at(i);
+                let parts: [&[u8]; 2] = (head, tail).into();
+                assert_eq!(run(&parts, None), want, "split at byte {i} of {doc:?}");
+            }
         }
+    }
+
+    #[test]
+    fn self_closing_title_does_not_stop_extraction() {
+        // Inside <svg> "/>" is honored, so <title/> reports no end tag.
+        let md = run(
+            &[b"<head><svg><title/></svg><meta property=\"og:title\" content=\"t\"></head>"],
+            None,
+        );
+        assert_eq!(meta(&md, "og:title"), Some("t"));
+    }
+
+    #[test]
+    fn self_closing_title_leaves_later_title_visible() {
+        let md = run(
+            &[b"<head><svg><title/></svg><title>Real</title></head>"],
+            None,
+        );
+        assert_eq!(md.title.as_deref(), Some("Real"));
+    }
+
+    #[test]
+    fn self_closing_head_falls_back_to_body_and_cap() {
+        let md = run(&[b"<head/><title>x</title>"], None);
+        assert_eq!(md.title.as_deref(), Some("x"));
+    }
+
+    #[test]
+    fn fuzz_reproducer_self_closing_title() {
+        // The first extract fuzz crash: a poisoned rewriter used to make
+        // finish() panic inside lol_html. Same doc, same chunk split.
+        let md = run(&[b"<svg/><!----><!--b-.", b"--><title/>"], None);
+        assert!(md.title.is_none());
+        assert!(md.meta.is_empty());
     }
 }
