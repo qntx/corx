@@ -46,6 +46,10 @@ These are the rules reviewers enforce:
   `global_fetch_strictly_public` compatibility flag instead.
 - Caches store CORS-free responses; `Access-Control-*` headers are applied
   after the cache lookup, never stored.
+- The Worker's Cache API key carries the corx version and a fingerprint
+  of the upstream `User-Agent` — changing either starts a fresh cache
+  namespace. The native moka cache needs neither: it dies with the
+  process, where version and UA are fixed.
 - URL-valued metadata fields are never truncated — an oversized URL is
   dropped whole (`clean_url`), while text fields truncate to their cap
   (`clean_text`).

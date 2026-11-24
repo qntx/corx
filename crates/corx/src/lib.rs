@@ -19,7 +19,10 @@ pub use error::Error;
 pub use fetch::{Fetch, FetchError};
 pub use maybe_send::{MaybeSend, MaybeSync};
 pub use preview::{Image, Media, Page, Preview, Source, Trace, preview};
-pub use target::Target;
+pub use target::{Target, fingerprint};
+
+/// The crate version; the Worker's cache key namespaces by it.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Maximum accepted length of a normalized target URL, in bytes.
 pub const MAX_URL_LEN: usize = 2048;

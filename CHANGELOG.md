@@ -58,6 +58,9 @@ the HTTP contract of the preview endpoint.
   target or Location could normalize to a longer URL (a cache key
   `Target::parse` rejects). Locations resolving to inadmissible URLs are
   now `redirect_failed`, not `invalid_url` (#65).
+- The Worker's Cache API key now carries the corx version and a
+  fingerprint of the upstream `User-Agent`; a redeploy changing either no
+  longer serves results cached under the old pair.
 
 ### Security
 

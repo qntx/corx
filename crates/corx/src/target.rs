@@ -8,6 +8,19 @@ use crate::{Error, MAX_URL_LEN};
 /// Reserved domain suffixes that can never be previewed.
 const BLOCKED_SUFFIXES: &[&str] = &[".localhost", ".local", ".internal", ".arpa", ".onion"];
 
+/// First 6 bytes of the SHA-256 of `input` as lowercase hex — a
+/// privacy-preserving identifier for logs and cache keys.
+#[must_use]
+pub fn fingerprint(input: &[u8]) -> String {
+    let digest = Sha256::digest(input);
+    digest
+        .iter()
+        .take(6)
+        .flat_map(|b| [b >> 4, b & 0x0f])
+        .map(|n| char::from_digit(u32::from(n), 16).unwrap_or('0'))
+        .collect()
+}
+
 /// A URL that passed every admission rule: http(s) only, no credentials,
 /// no explicit port, a dotted public domain (never an IP literal), no
 /// reserved suffixes, fragment stripped.
@@ -100,13 +113,7 @@ impl Target {
     /// a privacy-preserving identifier for logs.
     #[must_use]
     pub fn fingerprint(&self) -> String {
-        let digest = Sha256::digest(self.as_str().as_bytes());
-        digest
-            .iter()
-            .take(6)
-            .flat_map(|b| [b >> 4, b & 0x0f])
-            .map(|n| char::from_digit(u32::from(n), 16).unwrap_or('0'))
-            .collect()
+        fingerprint(self.as_str().as_bytes())
     }
 }
 
@@ -289,5 +296,17 @@ mod tests {
         assert_eq!(a.fingerprint(), b.fingerprint());
         assert_eq!(a.fingerprint().len(), 12);
         assert!(a.fingerprint().chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn fingerprint_helper_distinguishes_inputs() {
+        let ua = fingerprint(b"corx/0.4 (+https://github.com/qntx/corx)");
+        assert_eq!(ua, fingerprint(b"corx/0.4 (+https://github.com/qntx/corx)"));
+        assert_eq!(ua.len(), 12);
+        assert!(
+            ua.chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+        );
+        assert_ne!(ua, fingerprint(b"Mozilla/5.0"));
     }
 }

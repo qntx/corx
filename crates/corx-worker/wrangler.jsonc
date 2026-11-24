@@ -27,7 +27,9 @@
   "vars": {
     // Deployments MUST set this to a comma-separated Origin allowlist
     // (or "*" for fully public). Empty = no browser Origin is allowed.
-    // Optional USER_AGENT overrides the versioned corx default.
+    // Optional USER_AGENT overrides the versioned corx default. Changing
+    // it — or deploying a new corx version — starts a fresh cache
+    // namespace: the Cache API key carries both.
     "ALLOWED_ORIGINS": ""
   }
 }

@@ -209,12 +209,19 @@ struct WorkerRuntime {
     host: worker::RateLimiter,
     ctx: Context,
     cache_origin: String,
+    /// `&v=<corx version>&ua=<UA fingerprint>`: a cached body depends on
+    /// the version that rendered it and the User-Agent it was fetched
+    /// with, so a deploy changing either starts a fresh namespace.
+    cache_key_suffix: String,
 }
 
 impl WorkerRuntime {
     fn cache_url(&self, target: &str) -> String {
         let encoded: String = url::form_urlencoded::byte_serialize(target.as_bytes()).collect();
-        format!("{}/v1/preview?url={encoded}", self.cache_origin)
+        format!(
+            "{}/v1/preview?url={encoded}{}",
+            self.cache_origin, self.cache_key_suffix
+        )
     }
 }
 
@@ -283,6 +290,11 @@ async fn handle(req: Request, env: Env, ctx: Context) -> worker::Result<Response
     let host = env.rate_limiter("HOST_LIMITER")?;
 
     let controller = AbortController::default();
+    let cache_key_suffix = format!(
+        "&v={}&ua={}",
+        corx::VERSION,
+        corx::fingerprint(cfg.user_agent.as_bytes())
+    );
     let rt = WorkerRuntime {
         fetch: WorkerFetch {
             user_agent: cfg.user_agent,
@@ -292,6 +304,7 @@ async fn handle(req: Request, env: Env, ctx: Context) -> worker::Result<Response
         host,
         ctx,
         cache_origin,
+        cache_key_suffix,
     };
 
     let method = method_of(&req);
