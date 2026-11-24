@@ -6,13 +6,18 @@ use http::header::{
     ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE,
     CACHE_CONTROL, CONTENT_TYPE, VARY, X_CONTENT_TYPE_OPTIONS,
 };
-use http::{HeaderMap, HeaderValue, Method, StatusCode, Uri};
+use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri};
 use url::Url;
 
 use crate::{CACHE_CONTROL_SUCCESS, Error, Preview, Target};
 
 /// `Access-Control-Allow-Methods` for preflights.
 const ALLOW_METHODS: &str = "GET, HEAD, OPTIONS";
+
+/// The headers [`render`] sets on every JSON response; a runtime restoring
+/// a stored response keeps exactly these (`allow`/`retry-after` only occur
+/// on uncacheable responses).
+pub const RENDERED_HEADERS: [HeaderName; 3] = [CONTENT_TYPE, CACHE_CONTROL, X_CONTENT_TYPE_OPTIONS];
 
 /// What a request routed to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -291,6 +296,50 @@ mod tests {
         );
         assert!(body.get("description").is_none());
         assert!(res.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).is_none());
+    }
+
+    #[test]
+    fn render_header_set() {
+        let success = Ok(Preview {
+            url: "https://a.com".into(),
+            final_url: "https://a.com/".into(),
+            title: Some("T".into()),
+            description: None,
+            site_name: None,
+            image: None,
+            favicon: None,
+            card: None,
+            kind: None,
+            theme_color: None,
+            lang: None,
+            fetched_at: 7,
+        });
+        let errors = [
+            Error::InvalidUrl,
+            Error::ForbiddenOrigin,
+            Error::BlockedTarget,
+            Error::NotFound,
+            Error::NoMetadata,
+            Error::MethodNotAllowed,
+            Error::TooLarge,
+            Error::NotHtml,
+            Error::UpstreamStatus,
+            Error::RateLimited,
+            Error::UpstreamUnreachable,
+            Error::Overloaded,
+            Error::UpstreamTimeout,
+        ];
+        for result in std::iter::once(success).chain(errors.into_iter().map(Err)) {
+            let res = render(&result);
+            let names: std::collections::BTreeSet<_> =
+                res.headers().keys().map(HeaderName::as_str).collect();
+            let mut expected: std::collections::BTreeSet<_> =
+                RENDERED_HEADERS.iter().map(HeaderName::as_str).collect();
+            if matches!(result, Err(Error::MethodNotAllowed)) {
+                expected.insert(http::header::ALLOW.as_str());
+            }
+            assert_eq!(names, expected, "{result:?}");
+        }
     }
 
     #[test]

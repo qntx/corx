@@ -1,5 +1,5 @@
 [workspace]
-members         = ["crates/corx", "crates/corx-server", "crates/corx-worker"]
+members         = ["crates/corx", "crates/corx-conformance", "crates/corx-server", "crates/corx-worker"]
 default-members = ["crates/corx", "crates/corx-server"]
 resolver        = "3"
 

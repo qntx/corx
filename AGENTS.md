@@ -22,6 +22,15 @@ RUSTDOCFLAGS="-D warnings" cargo doc -p corx --no-deps
 cargo deny check
 ```
 
+Black-box conformance suite (same cases against both editions; the
+worker run needs `worker-build` 0.8.7 and Node, and uses wrangler
+4.149.0 through `npx`):
+
+```bash
+crates/corx-conformance/run.sh native
+crates/corx-conformance/run.sh worker
+```
+
 `docs/` is local-only and gitignored; never commit it.
 
 TOML is formatted by taplo (`.taplo.toml`, aligned `=`); keep `taplo fmt --check` green.

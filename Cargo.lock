@@ -469,6 +469,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "corx-conformance"
+version = "0.3.0"
+dependencies = [
+ "reqwest",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "corx-server"
 version = "0.3.0"
 dependencies = [

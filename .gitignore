@@ -29,6 +29,8 @@ crates/.DS_Store
 build/
 node_modules/
 .wrangler/
+.cache/
+crates/corx-worker/.wrangler.conformance.jsonc
 
 # Local-only design docs; never pushed.
 /docs/

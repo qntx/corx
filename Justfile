@@ -31,6 +31,10 @@ clippy-wasm:
 test:
     cargo test --workspace --all-features
 
+# Run the black-box conformance suite (edition: native|worker|remote).
+conformance edition:
+    crates/corx-conformance/run.sh {{ edition }}
+
 # Run the Worker locally (installs wrangler + worker-build via npm/cargo).
 worker-dev:
     cd crates/corx-worker && npx wrangler@4.149.0 dev --var ALLOWED_ORIGINS:http://localhost:5173

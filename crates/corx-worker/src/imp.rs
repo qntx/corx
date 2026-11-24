@@ -89,15 +89,22 @@ fn header_map(headers: &Headers) -> http::HeaderMap {
     map
 }
 
-/// Copies an [`http::HeaderMap`] onto a worker `Headers` object; header names
-/// or values that cannot be represented fail the copy.
-fn copy_headers(from: &http::HeaderMap, to: &Headers) -> worker::Result<()> {
+/// [`http::HeaderMap`] → a fresh worker `Headers` object: the first value of
+/// each name is `set`, further values are `append`ed. Building on
+/// `Headers::new` means the core's headers are the only ones present — nothing
+/// can accumulate on top of a runtime default.
+fn worker_headers(from: &http::HeaderMap) -> worker::Result<Headers> {
+    let headers = Headers::new();
     for (name, value) in from {
         if let Ok(v) = value.to_str() {
-            to.append(name.as_str(), v)?;
+            if headers.has(name.as_str())? {
+                headers.append(name.as_str(), v)?;
+            } else {
+                headers.set(name.as_str(), v)?;
+            }
         }
     }
-    Ok(())
+    Ok(headers)
 }
 
 /// `u16` status → [`http::StatusCode`]; invalid codes become 502 so they are
@@ -107,23 +114,37 @@ fn status(code: u16) -> http::StatusCode {
 }
 
 /// Converts a rendered core response into a fresh, mutable worker response.
+/// `ResponseBuilder::fixed`/`empty` do not default a `content-type` (unlike
+/// `Response::from_bytes`), so the headers sent are exactly the core's.
 /// Empty bodies become a true null body so null-body statuses (204/304)
 /// are built correctly.
 fn to_worker(res: &http::Response<Bytes>) -> worker::Result<Response> {
+    let builder = Response::builder()
+        .with_status(res.status().as_u16())
+        .with_headers(worker_headers(res.headers())?);
     let out = if res.body().is_empty() {
-        Response::empty()?
+        builder.empty()
     } else {
-        Response::from_bytes(res.body().to_vec())?
-    }
-    .with_status(res.status().as_u16());
-    copy_headers(res.headers(), out.headers())?;
+        builder.fixed(res.body().to_vec())
+    };
     Ok(out)
 }
 
 /// Rebuilds a cached entry as an owned http response: headers on `Cache::get`
 /// results are immutable in workerd, so the core renders CORS onto a copy.
+/// Only [`corx::http::RENDERED_HEADERS`] carry over — workerd cache metadata
+/// (`Age`, `CF-Cache-Status`, a frozen `Date`) must not leak to clients.
 async fn cached_to_http(mut cached: Response) -> worker::Result<http::Response<Bytes>> {
-    let map = header_map(cached.headers());
+    let mut map = http::HeaderMap::new();
+    for (name, value) in cached.headers().entries() {
+        if let (Ok(n), Ok(v)) = (
+            name.parse::<http::header::HeaderName>(),
+            HeaderValue::from_str(&value),
+        ) && corx::http::RENDERED_HEADERS.contains(&n)
+        {
+            map.append(n, v);
+        }
+    }
     let body = Bytes::from(cached.bytes().await?);
     let mut out = http::Response::new(body);
     *out.status_mut() = status(cached.status_code());

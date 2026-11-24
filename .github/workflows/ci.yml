@@ -36,3 +36,37 @@ jobs:
       targets: wasm32-unknown-unknown
       packages: corx corx-worker
       features: --all-features
+
+  conformance-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: conformance-native
+      - name: Run the conformance suite against the native edition
+        run: crates/corx-conformance/run.sh native
+
+  conformance-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Install the wasm32 target and worker-build
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install worker-build --version 0.8.7 --locked
+      - name: Run the conformance suite against the Workers edition
+        run: crates/corx-conformance/run.sh worker

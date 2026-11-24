@@ -20,11 +20,12 @@ Thanks for taking the time to improve corx.
 ## Repository layout
 
 ```text
-crates/corx/          sans-IO core (publishable; builds native + wasm32)
-crates/corx-server/   the `corx` binary: axum + reqwest + governor + moka
-crates/corx-worker/   Cloudflare Worker adapter (workers-rs, cdylib) and wrangler.jsonc
-Dockerfile            multi-stage cargo-chef image (distroless runtime)
-.github/              CI, release, docker and dependabot workflows
+crates/corx/              sans-IO core (publishable; builds native + wasm32)
+crates/corx-conformance/  black-box conformance suite for both editions
+crates/corx-server/       the `corx` binary: axum + reqwest + governor + moka
+crates/corx-worker/       Cloudflare Worker adapter (workers-rs, cdylib) and wrangler.jsonc
+Dockerfile                multi-stage cargo-chef image (distroless runtime)
+.github/                  CI, release, docker and dependabot workflows
 ```
 
 ## Architecture invariants
@@ -118,8 +119,11 @@ with `198.18.0.0/15` addresses, which corx correctly rejects as reserved.
   `tokio::time::pause`.
 - `NativeFetch` tests hit a local axum server via IP-literal URLs — the core
   rejects IP literals in `Target::parse`, never inside `get`.
-- The Worker is verified with `worker-build --release` plus a `wrangler dev`
-  smoke run.
+- The black-box conformance suite in `crates/corx-conformance` runs the same
+  HTTP assertions against both editions: `run.sh native` builds and boots
+  `corx`, `run.sh worker` serves `crates/corx-worker` under
+  `wrangler dev --local`. Each case asserts the exact response header set —
+  no case needs the public web.
 
 ## Dependencies
 
