@@ -35,18 +35,28 @@ impl Target {
     /// rejected.
     ///
     /// # Errors
-    /// `Error::RedirectFailed` when `location` is unparseable; otherwise the
-    /// same errors as [`Target::parse`].
+    /// `Error::RedirectFailed` when `location` is unparseable or resolves to
+    /// a URL that fails syntactic validation (non-http(s) scheme,
+    /// credentials, an explicit port, or more than `MAX_URL_LEN` bytes after
+    /// normalization) — upstream redirect problems, not client errors.
+    /// `Error::BlockedTarget` for well-formed URLs pointing at private or
+    /// reserved destinations.
     pub fn redirect(&self, location: &str) -> Result<Self, Error> {
         let mut joined = self.0.join(location).map_err(|_| Error::RedirectFailed)?;
         if self.0.scheme() == "https" && joined.scheme() == "http" {
             return Err(Error::BlockedTarget);
         }
         joined.set_fragment(None);
-        Self::validate(joined)
+        Self::validate(joined).map_err(|e| match e {
+            Error::InvalidUrl => Error::RedirectFailed,
+            e => e,
+        })
     }
 
     fn validate(url: Url) -> Result<Self, Error> {
+        if url.as_str().len() > MAX_URL_LEN {
+            return Err(Error::InvalidUrl);
+        }
         if !matches!(url.scheme(), "http" | "https") {
             return Err(Error::InvalidUrl);
         }
@@ -235,13 +245,41 @@ mod tests {
         assert_eq!(http.redirect("//localhost/x"), Err(Error::BlockedTarget));
         // Unparseable Location is a redirect failure.
         assert_eq!(http.redirect("http://[bad"), Err(Error::RedirectFailed));
-        // Redirect to a non-http scheme is just an invalid target.
-        assert_eq!(http.redirect("ftp://a.example/x"), Err(Error::InvalidUrl));
+        // A Location that resolves to a syntactically inadmissible URL is an
+        // upstream redirect problem, not a client error.
+        assert_eq!(
+            http.redirect("ftp://a.example/x"),
+            Err(Error::RedirectFailed)
+        );
+        assert_eq!(
+            http.redirect("http://u:p@a.example/x"),
+            Err(Error::RedirectFailed)
+        );
+        assert_eq!(
+            http.redirect("http://a.example:8080/x"),
+            Err(Error::RedirectFailed)
+        );
         // Fragment on the location is stripped.
         assert_eq!(
             http.redirect("/x#y").expect("ok").as_str(),
             "http://a.example/x"
         );
+    }
+
+    #[test]
+    fn rejects_normalized_too_long() {
+        // 700 DEL bytes percent-encode to 3 bytes each (%7F): 718 raw
+        // bytes in, 2118 normalized bytes out.
+        let raw = format!("https://a.example/{}", "\u{7f}".repeat(700));
+        assert!(raw.len() <= MAX_URL_LEN);
+        assert_eq!(parse(&raw), Err(Error::InvalidUrl));
+    }
+
+    #[test]
+    fn redirect_normalized_too_long_fails() {
+        let http = parse("http://a.example/").expect("base");
+        let location = format!("/{}", "\u{7f}".repeat(700));
+        assert_eq!(http.redirect(&location), Err(Error::RedirectFailed));
     }
 
     #[test]

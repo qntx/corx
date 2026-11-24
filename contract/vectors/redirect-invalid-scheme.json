@@ -1,0 +1,28 @@
+{
+  "description": "a Location with a non-http(s) scheme is 422 redirect_failed",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/",
+      "status": 302,
+      "headers": {
+        "location": "ftp://a.example/x"
+      }
+    }
+  ],
+  "expect": {
+    "status": 422,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=3600"
+    },
+    "body": {
+      "error": "redirect_failed",
+      "message": "the upstream redirect is missing, malformed, or exceeds the hop limit"
+    }
+  }
+}
