@@ -22,4 +22,4 @@ jobs:
       pull-requests: write
       checks: read
       actions: read
-    uses: qntx/workflows/.github/workflows/ops-dependabot.yml@v2
+    uses: qntx/workflows/.github/workflows/ops-dependabot.yml@461b483156e434d004b0d936e24cca6b9aabd659

@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   container:
-    uses: qntx/workflows/.github/workflows/publish-container.yml@v2
+    uses: qntx/workflows/.github/workflows/publish-container.yml@461b483156e434d004b0d936e24cca6b9aabd659
     permissions:
       contents: read
       packages: write
