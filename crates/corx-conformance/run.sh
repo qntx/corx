@@ -87,7 +87,7 @@ start_server() {
             cd "$root/crates/corx-worker"
             # Persist into the run's temp dir so a stale local cache can
             # never leak entries between conformance runs.
-            npx --yes wrangler@4.149.0 dev --local --port "$port" \
+            npx --yes wrangler@4.164.0 dev --local --port "$port" \
                 -c .wrangler.conformance.jsonc \
                 --var "ALLOWED_ORIGINS:https://app.example" \
                 --persist-to "$tmpdir/persist" \

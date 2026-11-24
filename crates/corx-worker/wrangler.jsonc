@@ -2,12 +2,12 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "corx",
   "main": "build/index.js",
-  "compatibility_date": "2026-10-01",
+  "compatibility_date": "2026-11-17",
   // SSRF control: global fetch may only route to public-internet
   // destinations; it cannot reach same-zone/origin hosts.
   "compatibility_flags": ["global_fetch_strictly_public"],
   "build": {
-    "command": "cargo install -q worker-build --locked --version 0.8.7 && worker-build --release"
+    "command": "cargo install -q worker-build --locked --version 0.9.0 && worker-build --release"
   },
   "observability": {
     "enabled": true

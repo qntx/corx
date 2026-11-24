@@ -17,7 +17,7 @@ curl 'http://localhost:8080/v1/preview?url=https%3A%2F%2Fexample.com'
 
 `corx --help` lists every flag with its `CORX_*` environment variable. The Worker is configured in `crates/corx-worker/wrangler.jsonc` and deployed with wrangler (`ALLOWED_ORIGINS` must be set).
 
-Changes are tracked in [CHANGELOG.md](CHANGELOG.md); contributor invariants and the local gate live in [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
+The HTTP contract — request, response shapes, fields, errors and limits — is documented in [contract/README.md](contract/README.md). Changes are tracked in [CHANGELOG.md](CHANGELOG.md); contributor invariants and the local gate live in [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

@@ -34,10 +34,7 @@ struct Cfg {
 }
 
 fn cfg(env: &Env) -> Result<Cfg, worker::Error> {
-    let raw = env
-        .var("ALLOWED_ORIGINS")
-        .map(|v| v.to_string())
-        .unwrap_or_default();
+    let raw = env.var("ALLOWED_ORIGINS").map_or_default(|v| v.to_string());
     let origins = Origins::parse(&raw)
         .map_err(|e| worker::Error::RustError(format!("ALLOWED_ORIGINS: {e}")))?;
     let user_agent = env

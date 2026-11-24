@@ -9,6 +9,55 @@ the HTTP contract of the preview endpoint.
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 
+## [0.4.0] - Unreleased
+
+### Changed (BREAKING)
+
+- HTTP contract reshaped: success bodies are a union tagged on `kind`
+  (`page` | `media`). Pages gain `source` (`html` | `oembed`) and need a
+  title or an image. A non-HTML final hop becomes `media` (`mediaType`,
+  `size`). `unsupported_content` replaces `not_html` and only covers a
+  missing or unparseable Content-Type (#61).
+- `redirect_failed` replaces `upstream_status` for redirect problems and
+  `upstream_status` bodies now carry `upstreamStatus` (the final hop's
+  status); the total request budget is 6 s (#62).
+- `Fetch::get` takes the `Accept` value as a parameter (#63).
+- Rust 1.100 toolchain; worker 0.9.0, worker-build 0.9.0, wrangler
+  4.164.0 and `compatibility_date` 2026-11-17; version bump to 0.4.0.
+
+### Added
+
+- `contract/` directory: prose contract, JSON schema and 71 golden
+  vectors validating the HTTP shape (#61).
+- Per-request diagnostics: `upstream_status`, `hops` and `oembed_status`
+  on the `Record`/structured logs of both adapters (#62, #63).
+- oEmbed fallback for reddit.com and tiktok.com when HTML extraction
+  fails or yields too little (#63).
+- Black-box conformance suite `corx-conformance` running the same cases
+  against both editions, wired into CI (#60).
+- `corx-corpus`: corpus runner/compare tool, the URL corpus,
+  `corpus/ua-sweep.sh` and the weekly advisory corpus workflow (#64).
+- cargo-fuzz targets (`extract`, `target`) in an isolated `fuzz/`
+  workspace plus a PR job and a daily scheduled workflow (#65).
+
+### Fixed
+
+- The Worker sent `content-type: application/octet-stream, application/json`
+  on every response (three values on cache hits), and cache hits leaked
+  `Age`, `CF-Cache-Status` and a frozen `Date` (#60).
+- The extractor panicked when the lol_html rewriter was poisoned (e.g. by
+  a `<title/>` inside SVG), which aborts the process in release builds: a
+  crafted page took down the native server (#65).
+- Title extraction depended on body chunk boundaries when `done` fired
+  mid-title (#65).
+
+### Security
+
+- Lockfile updates resolving previously open RustSec advisories (#59).
+- Still open: RUSTSEC-2026-0592 (`url`; the fix, 2.5.9, is younger than
+  the 7-day rule until 2026-11-28) and RUSTSEC-2026-0543 (`chrono` is
+  unmaintained and a non-optional dependency of every `worker` release).
+
 ## [0.3.0] - 2026-10-18
 
 ### Changed (BREAKING)
@@ -27,7 +76,6 @@ the HTTP contract of the preview endpoint.
 - All previous configuration (TOML file, CLI subcommands) replaced by a
   small set of `CORX_*` env vars / flags.
 - Helm chart, Compose files and the old proxy code have been removed.
-
 
 ## [0.2.0] -- enterprise upgrade
 

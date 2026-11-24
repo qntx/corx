@@ -86,7 +86,7 @@ for ua in "$@"; do
     server_log="$(mktemp)"
     (
         cd "$worker"
-        npx --yes wrangler@4.149.0 dev "$mode" --port "$port" \
+        npx --yes wrangler@4.164.0 dev "$mode" --port "$port" \
             --var "ALLOWED_ORIGINS:*" \
             --var "USER_AGENT:$ua" \
             --persist-to "$persist" \

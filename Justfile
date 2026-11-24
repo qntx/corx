@@ -45,8 +45,8 @@ corpus-ua *uas:
 
 # Run the Worker locally (installs wrangler + worker-build via npm/cargo).
 worker-dev:
-    cd crates/corx-worker && npx wrangler@4.149.0 dev --var ALLOWED_ORIGINS:http://localhost:5173
+    cd crates/corx-worker && npx wrangler@4.164.0 dev --var ALLOWED_ORIGINS:http://localhost:5173
 
 # Deploy the Worker to Cloudflare.
 worker-deploy:
-    cd crates/corx-worker && npx wrangler@4.149.0 deploy
+    cd crates/corx-worker && npx wrangler@4.164.0 deploy

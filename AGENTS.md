@@ -23,8 +23,8 @@ cargo deny check
 ```
 
 Black-box conformance suite (same cases against both editions; the
-worker run needs `worker-build` 0.8.7 and Node, and uses wrangler
-4.149.0 through `npx`):
+worker run needs `worker-build` 0.9.0 and Node, and uses wrangler
+4.164.0 through `npx`):
 
 ```bash
 crates/corx-conformance/run.sh native

@@ -9,7 +9,7 @@
 #
 # Multi-arch: the base images are multi-arch out of the box.
 
-ARG RUST_VERSION=1.94
+ARG RUST_VERSION=1.100
 
 FROM rust:${RUST_VERSION}-slim-bookworm AS chef
 ENV CARGO_TERM_COLOR=always

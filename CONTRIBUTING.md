@@ -4,15 +4,10 @@ Thanks for taking the time to improve corx.
 
 ## Prerequisites
 
-- **Rust stable** via `rust-toolchain.toml`; the minimum supported version is
-  `[workspace.package].rust-version` in `Cargo.toml`.
-- **`wasm32-unknown-unknown` target** — the core and the Worker must build for
-  it:
-
-  ```bash
-  rustup target add wasm32-unknown-unknown
-  ```
-
+- **Rust 1.100.0**, pinned in `rust-toolchain.toml` together with rustfmt,
+  clippy and the `wasm32-unknown-unknown` target (the core and the Worker
+  must build for it); rustup installs all of it on first use. The minimum
+  supported version is `[workspace.package].rust-version` in `Cargo.toml`.
 - **cargo-deny** for the supply-chain check (`cargo install cargo-deny`).
 - **Node.js** — `npx` runs wrangler and taplo; no other JS tooling is required.
 - **Optional**: `just` (recipe shortcuts in `Justfile`), Docker (image build).
@@ -105,10 +100,10 @@ Every flag has a `CORX_*` environment variable; `corx --help` lists them.
 Worker:
 
 ```bash
-just worker-dev   # wrangler 4.149.0 (pinned), ALLOWED_ORIGINS=http://localhost:5173
+just worker-dev   # wrangler 4.164.0 (pinned), ALLOWED_ORIGINS=http://localhost:5173
 ```
 
-or `npx wrangler@4.149.0 dev --var ALLOWED_ORIGINS:…` from
+or `npx wrangler@4.164.0 dev --var ALLOWED_ORIGINS:…` from
 `crates/corx-worker`. The Cache API works in `wrangler dev` and on custom
 domains/routes, but not on `*.workers.dev` hostnames.
 
@@ -163,7 +158,7 @@ x86_64).
 
 Only depend on versions published at least 7 days ago (the Dependabot
 cooldown matches). Keep `cargo deny check` green. `worker-build` and
-wrangler versions are pinned (0.8.7 and 4.149.0) — bump them deliberately.
+wrangler versions are pinned (0.9.0 and 4.164.0) — bump them deliberately.
 
 ## Versioning and release
 
