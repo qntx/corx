@@ -25,8 +25,8 @@ pub enum Error {
     MethodNotAllowed,
     /// The upstream body exceeded `MAX_HTML_BYTES` before `</head>`.
     TooLarge,
-    /// The upstream response was not HTML.
-    NotHtml,
+    /// The upstream `Content-Type` was missing or unparseable.
+    UnsupportedContent,
     /// The upstream returned a non-2xx status or a malformed redirect.
     UpstreamStatus,
     /// The caller exceeded a rate limit.
@@ -49,7 +49,7 @@ impl Error {
             Self::NotFound | Self::NoMetadata => StatusCode::NOT_FOUND,
             Self::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
             Self::TooLarge => StatusCode::PAYLOAD_TOO_LARGE,
-            Self::NotHtml => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            Self::UnsupportedContent => StatusCode::UNSUPPORTED_MEDIA_TYPE,
             Self::UpstreamStatus => StatusCode::UNPROCESSABLE_ENTITY,
             Self::RateLimited => StatusCode::TOO_MANY_REQUESTS,
             Self::UpstreamUnreachable => StatusCode::BAD_GATEWAY,
@@ -69,7 +69,7 @@ impl Error {
             Self::NoMetadata => "no_metadata",
             Self::MethodNotAllowed => "method_not_allowed",
             Self::TooLarge => "too_large",
-            Self::NotHtml => "not_html",
+            Self::UnsupportedContent => "unsupported_content",
             Self::UpstreamStatus => "upstream_status",
             Self::RateLimited => "rate_limited",
             Self::UpstreamUnreachable => "upstream_unreachable",
@@ -89,7 +89,7 @@ impl Error {
             Self::NoMetadata => "the page contains no usable link metadata",
             Self::MethodNotAllowed => "method not allowed",
             Self::TooLarge => "the response exceeded the size limit",
-            Self::NotHtml => "the response is not HTML",
+            Self::UnsupportedContent => "the response content type is missing or unsupported",
             Self::UpstreamStatus => "the upstream server returned an unexpected status",
             Self::RateLimited => "rate limit exceeded",
             Self::UpstreamUnreachable => "the target could not be reached",
@@ -137,7 +137,7 @@ mod tests {
             (Error::NoMetadata, 404, "no_metadata", true),
             (Error::MethodNotAllowed, 405, "method_not_allowed", false),
             (Error::TooLarge, 413, "too_large", false),
-            (Error::NotHtml, 415, "not_html", false),
+            (Error::UnsupportedContent, 415, "unsupported_content", false),
             (Error::UpstreamStatus, 422, "upstream_status", true),
             (Error::RateLimited, 429, "rate_limited", false),
             (

@@ -24,6 +24,7 @@ crates/corx/              sans-IO core (publishable; builds native + wasm32)
 crates/corx-conformance/  black-box conformance suite for both editions
 crates/corx-server/       the `corx` binary: axum + reqwest + governor + moka
 crates/corx-worker/       Cloudflare Worker adapter (workers-rs, cdylib) and wrangler.jsonc
+contract/                 the HTTP contract: prose, JSON schema, golden vectors
 Dockerfile                multi-stage cargo-chef image (distroless runtime)
 .github/                  CI, release, docker and dependabot workflows
 ```
@@ -58,10 +59,12 @@ These are the rules reviewers enforce:
 
 `GET|HEAD|OPTIONS /v1/preview?url=…`, its JSON fields, error slugs, status
 codes and `Cache-Control` values are a **public contract** consumed by
-clients (Meowl). Changing any of them is a breaking change. Two tests guard
-it: the exact-JSON contract test in `corx::preview` (`json_contract`) and
-the status/slug/cacheability table test in `corx::error`
-(`status_and_slug_table`).
+clients (Meowl) — see `contract/` for the prose spec
+(`contract/README.md`), the JSON schema (`contract/preview.schema.json`)
+and the golden vectors (`contract/vectors/`). Changing any of them is a
+breaking change. The `contract` and `vectors` integration tests in
+`crates/corx` guard it: every rendered shape validates against the schema
+and every vector replays through the pipeline.
 
 ## Local gate
 

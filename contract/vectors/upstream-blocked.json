@@ -1,0 +1,25 @@
+{
+  "description": "a blocked destination is 403 blocked_target",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/",
+      "error": "blocked"
+    }
+  ],
+  "expect": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    },
+    "body": {
+      "error": "blocked_target",
+      "message": "the target host is not allowed"
+    }
+  }
+}

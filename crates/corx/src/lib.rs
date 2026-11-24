@@ -17,7 +17,7 @@ mod target;
 pub use error::Error;
 pub use fetch::{Fetch, FetchError};
 pub use maybe_send::{MaybeSend, MaybeSync};
-pub use preview::{Image, Preview, preview};
+pub use preview::{Image, Media, Page, Preview, Source, preview};
 pub use target::Target;
 
 /// Maximum accepted length of a target URL, in bytes.

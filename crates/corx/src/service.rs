@@ -261,7 +261,7 @@ mod tests {
     use futures_core::Stream;
     use futures_util::stream;
     use http::header::CONTENT_TYPE;
-    use http::header::{ACCESS_CONTROL_ALLOW_ORIGIN, ALLOW, VARY};
+    use http::header::{ACCESS_CONTROL_ALLOW_ORIGIN, VARY};
     use url::Url;
 
     use super::*;
@@ -437,44 +437,6 @@ mod tests {
             .routes
             .insert("https://a.com/".into(), page("Hi"));
         (rt, Origins::parse(ORIGINS).expect("origins"), page("Hi"))
-    }
-
-    #[test]
-    fn forbidden_origin_never_fetches() {
-        let (rt, origins, _) = fixture();
-        let method = Method::GET;
-        let uri: Uri = URI.parse().expect("uri");
-        let origin = HeaderValue::from_static("https://evil.example");
-        let (res, rec) = futures_executor::block_on(handle(
-            &rt,
-            &origins,
-            incoming(&method, &uri, Some(&origin), None),
-        ));
-        assert_eq!(res.status(), StatusCode::FORBIDDEN);
-        assert_eq!(rec.outcome, "forbidden_origin");
-        assert_eq!(rt.calls(), 0);
-    }
-
-    #[test]
-    fn preflight_and_405() {
-        let (rt, origins, _) = fixture();
-        let method = Method::OPTIONS;
-        let uri: Uri = "https://svc/v1/preview".parse().expect("uri");
-        let (res, rec) =
-            futures_executor::block_on(handle(&rt, &origins, incoming(&method, &uri, None, None)));
-        assert_eq!(res.status(), StatusCode::NO_CONTENT);
-        assert_eq!(rec.outcome, "preflight");
-
-        let post = Method::POST;
-        let uri2: Uri = URI.parse().expect("uri");
-        let (denied, rec2) =
-            futures_executor::block_on(handle(&rt, &origins, incoming(&post, &uri2, None, None)));
-        assert_eq!(denied.status(), StatusCode::METHOD_NOT_ALLOWED);
-        assert_eq!(
-            denied.headers().get(ALLOW).expect("allow"),
-            "GET, HEAD, OPTIONS"
-        );
-        assert_eq!(rec2.outcome, "method_not_allowed");
     }
 
     #[test]

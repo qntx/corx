@@ -1,0 +1,19 @@
+{
+  "description": "a url parameter that is not a URL is 400",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=not%20a%20url"
+  },
+  "expect": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    },
+    "body": {
+      "error": "invalid_url",
+      "message": "the url parameter is missing, malformed, or unsupported"
+    }
+  }
+}

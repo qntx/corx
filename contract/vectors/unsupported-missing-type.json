@@ -1,0 +1,25 @@
+{
+  "description": "a 200 without Content-Type is 415 unsupported_content",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/",
+      "status": 200
+    }
+  ],
+  "expect": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    },
+    "body": {
+      "error": "unsupported_content",
+      "message": "the response content type is missing or unsupported"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "description": "an upstream timeout is 504",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/",
+      "error": "timeout"
+    }
+  ],
+  "expect": {
+    "status": 504,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    },
+    "body": {
+      "error": "upstream_timeout",
+      "message": "the upstream server timed out"
+    }
+  }
+}

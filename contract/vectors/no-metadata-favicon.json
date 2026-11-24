@@ -1,0 +1,29 @@
+{
+  "description": "a favicon alone is not a preview",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body": "<html><head><link rel=\"icon\" href=\"/f.ico\"></head><body>"
+    }
+  ],
+  "expect": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=3600"
+    },
+    "body": {
+      "error": "no_metadata",
+      "message": "the page contains no usable link metadata"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "description": "host-bucket denial renders 429 with Retry-After",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "runtime": {
+    "deny": "host"
+  },
+  "expect": {
+    "status": 429,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "retry-after": "7"
+    },
+    "body": {
+      "error": "rate_limited",
+      "message": "rate limit exceeded"
+    }
+  }
+}

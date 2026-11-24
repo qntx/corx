@@ -8,10 +8,24 @@ use url::Url;
 use crate::extract::{Extractor, Flow, Metadata};
 use crate::{Error, Fetch, MAX_HTML_BYTES, MAX_REDIRECTS, MAX_URL_LEN, Target};
 
-/// A resolved link preview.
+/// A resolved link preview, tagged on `kind`.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "built once per request and never stored; boxing would only complicate the API"
+)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum Preview {
+    /// An HTML page's metadata.
+    Page(Page),
+    /// A non-HTML resource described by its response headers.
+    Media(Media),
+}
+
+/// A resolved HTML page preview.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Preview {
+pub struct Page {
     /// The requested URL, as validated.
     pub url: String,
     /// The URL of the final hop after redirects.
@@ -43,6 +57,35 @@ pub struct Preview {
     /// `html[lang]`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lang: Option<String>,
+    /// Where the metadata came from.
+    pub source: Source,
+    /// Unix seconds when the final hop was fetched.
+    pub fetched_at: u64,
+}
+
+/// Where a preview's metadata was extracted from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Source {
+    /// The target's own HTML `<head>`.
+    Html,
+    /// An oEmbed endpoint (`page` only; produced by the oEmbed fallback).
+    Oembed,
+}
+
+/// A resolved non-HTML resource preview.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Media {
+    /// The requested URL, as validated.
+    pub url: String,
+    /// The URL of the final hop after redirects.
+    pub final_url: String,
+    /// The response's MIME essence, lowercased.
+    pub media_type: String,
+    /// `Content-Length`, present only when the body is unencoded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
     /// Unix seconds when the final hop was fetched.
     pub fetched_at: u64,
 }
@@ -139,15 +182,40 @@ pub async fn preview<F: Fetch>(
             .as_deref()
             .and_then(|ct| ct.parse::<mime::Mime>().ok());
         let Some(mime) = mime else {
-            return Err(Error::NotHtml);
+            return Err(Error::UnsupportedContent);
         };
-        if mime.essence_str() != "text/html" && mime.essence_str() != "application/xhtml+xml" {
-            return Err(Error::NotHtml);
+        if mime.essence_str() == "text/html" || mime.essence_str() == "application/xhtml+xml" {
+            let cs = mime.get_param(mime::CHARSET).map(|c| c.as_str().to_owned());
+            let md = drain(response.into_body(), cs.as_deref()).await?;
+            return build(&original, &current, md, now_unix_secs);
         }
-        let cs = mime.get_param(mime::CHARSET).map(|c| c.as_str().to_owned());
-        let md = drain(response.into_body(), cs.as_deref()).await?;
-        return build(&original, &current, md, now_unix_secs);
+        // Not HTML: the resource itself is the preview — its body is never
+        // read, so dropping the response closes the connection.
+        let size = media_size(response.headers());
+        let media = Preview::Media(Media {
+            url: original,
+            final_url: current.as_str().to_owned(),
+            media_type: mime.essence_str().to_owned(),
+            size,
+            fetched_at: now_unix_secs,
+        });
+        drop(response);
+        return Ok(media);
     }
+}
+
+/// `Content-Length` as `u64`, present only when the body is unencoded — an
+/// encoded body's length would describe the compressed form.
+fn media_size(headers: &::http::HeaderMap) -> Option<u64> {
+    if let Some(encoding) = headers.get(::http::header::CONTENT_ENCODING)
+        && !encoding.as_bytes().eq_ignore_ascii_case(b"identity")
+    {
+        return None;
+    }
+    headers
+        .get(::http::header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|raw| raw.trim().parse::<u64>().ok())
 }
 
 async fn drain<S>(mut body: S, charset: Option<&str>) -> Result<Metadata, Error>
@@ -232,16 +300,13 @@ fn build(original: &str, current: &Target, md: Metadata, now: u64) -> Result<Pre
         .or(md.touch_icon.as_deref())
         .and_then(|raw| resolve(raw, &base));
 
-    if title.is_none()
-        && description.is_none()
-        && site_name.is_none()
-        && image.is_none()
-        && favicon.is_none()
-    {
+    // A page requires a title or an image; description/siteName/favicon
+    // alone are not a preview.
+    if title.is_none() && image.is_none() {
         return Err(Error::NoMetadata);
     }
 
-    Ok(Preview {
+    Ok(Preview::Page(Page {
         url: original.to_owned(),
         final_url: current.as_str().to_owned(),
         title,
@@ -253,410 +318,7 @@ fn build(original: &str, current: &Target, md: Metadata, now: u64) -> Result<Pre
         kind: meta(&md, &["og:type"]).map(str::to_owned),
         theme_color: meta(&md, &["theme-color"]).map(str::to_owned),
         lang: md.lang,
+        source: Source::Html,
         fetched_at: now,
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-    use std::pin::Pin;
-
-    use bytes::Bytes;
-    use futures_core::Stream;
-    use futures_util::stream;
-    use http::{HeaderValue, StatusCode, header::CONTENT_TYPE, header::LOCATION};
-    use url::Url;
-
-    use super::{Image, Preview, preview};
-    use crate::{Error, Fetch, FetchError, MAX_HTML_BYTES, Target};
-
-    type Body = Pin<Box<dyn Stream<Item = Result<Bytes, FetchError>> + Send>>;
-
-    use futures_executor::block_on;
-
-    struct Fake {
-        routes: HashMap<String, Result<http::Response<Vec<Bytes>>, FetchError>>,
-    }
-
-    impl Fake {
-        fn new() -> Self {
-            Self {
-                routes: HashMap::new(),
-            }
-        }
-
-        fn respond(&mut self, url: &str, res: http::Response<Vec<Bytes>>) -> &mut Self {
-            self.routes.insert(url.to_owned(), Ok(res));
-            self
-        }
-
-        fn fail(&mut self, url: &str, err: FetchError) -> &mut Self {
-            self.routes.insert(url.to_owned(), Err(err));
-            self
-        }
-    }
-
-    impl Fetch for Fake {
-        type Body = Body;
-
-        fn get(
-            &self,
-            url: &Url,
-        ) -> impl Future<Output = Result<http::Response<Self::Body>, FetchError>> + Send {
-            let out = match self.routes.get(url.as_str()) {
-                Some(Ok(res)) => {
-                    let (parts, chunks) = res.clone().into_parts();
-                    let body: Body = Box::pin(stream::iter(chunks.into_iter().map(Ok)));
-                    Ok(http::Response::from_parts(parts, body))
-                }
-                Some(Err(err)) => Err(*err),
-                None => Err(FetchError::Unreachable),
-            };
-            std::future::ready(out)
-        }
-    }
-
-    fn response(
-        status: StatusCode,
-        headers: &[(&'static str, &'static str)],
-        body: &str,
-    ) -> http::Response<Vec<Bytes>> {
-        let mut res = http::Response::new(vec![Bytes::copy_from_slice(body.as_bytes())]);
-        *res.status_mut() = status;
-        for (name, value) in headers {
-            res.headers_mut()
-                .insert(*name, HeaderValue::from_static(value));
-        }
-        res
-    }
-
-    fn html(body: &str) -> http::Response<Vec<Bytes>> {
-        response(
-            StatusCode::OK,
-            &[(CONTENT_TYPE.as_str(), "text/html")],
-            body,
-        )
-    }
-
-    fn redirect_to(location: &'static str) -> http::Response<Vec<Bytes>> {
-        response(StatusCode::FOUND, &[(LOCATION.as_str(), location)], "")
-    }
-
-    fn target(raw: &str) -> Target {
-        Target::parse(raw).expect("valid target")
-    }
-
-    const OG: &str = r##"<html lang="en"><head><title>Doc</title>
-        <meta property="og:title" content="OGT"><meta property="og:image" content="/img.png">
-        <meta property="og:image:width" content="640"><meta name="theme-color" content="#abc">
-        <link rel="icon" href="favicon.ico"></head><body></body></html>"##;
-
-    #[test]
-    fn basic_og_page() {
-        let mut fake = Fake::new();
-        fake.respond("https://a.com/", html(OG));
-        let p = block_on(preview(&fake, target("https://a.com"), 42)).expect("preview");
-        assert_eq!(p.url, "https://a.com/");
-        assert_eq!(p.final_url, "https://a.com/");
-        assert_eq!(p.title.as_deref(), Some("OGT"));
-        assert_eq!(p.lang.as_deref(), Some("en"));
-        assert_eq!(p.theme_color.as_deref(), Some("#abc"));
-        assert_eq!(p.favicon.as_deref(), Some("https://a.com/favicon.ico"));
-        assert_eq!(
-            p.image,
-            Some(Image {
-                url: "https://a.com/img.png".into(),
-                width: Some(640),
-                height: None,
-                alt: None,
-            })
-        );
-        assert_eq!(p.fetched_at, 42);
-    }
-
-    #[test]
-    fn title_fallback_chain() {
-        let mut fake = Fake::new();
-        fake.respond(
-            "https://a.com/",
-            html("<head><meta name=\"twitter:title\" content=\"Tw\"><meta name=\"description\" content=\"d\"><title>TT</title></head>"),
-        );
-        let p = block_on(preview(&fake, target("https://a.com"), 0)).expect("preview");
-        assert_eq!(p.title.as_deref(), Some("Tw"));
-        assert_eq!(p.description.as_deref(), Some("d"));
-
-        let mut fake2 = Fake::new();
-        fake2.respond("https://a.com/", html("<head><title>TT</title></head>"));
-        let p2 = block_on(preview(&fake2, target("https://a.com"), 0)).expect("preview");
-        assert_eq!(p2.title.as_deref(), Some("TT"));
-    }
-
-    #[test]
-    fn base_href_resolution() {
-        let mut fake = Fake::new();
-        fake.respond(
-            "https://a.com/dir/page",
-            html("<head><base href=\"/assets/\"><meta property=\"og:image\" content=\"i.png\"><link rel=\"icon\" href=\"f.ico\"></head>"),
-        );
-        let p = block_on(preview(&fake, target("https://a.com/dir/page"), 0)).expect("preview");
-        assert_eq!(p.image.expect("image").url, "https://a.com/assets/i.png");
-        assert_eq!(p.favicon.as_deref(), Some("https://a.com/assets/f.ico"));
-        // A non-http base is ignored; resolution falls back to the final URL.
-        let mut fake2 = Fake::new();
-        fake2.respond(
-            "https://a.com/",
-            html("<head><base href=\"javascript:x\"><meta property=\"og:image\" content=\"/i.png\"></head>"),
-        );
-        let p2 = block_on(preview(&fake2, target("https://a.com"), 0)).expect("preview");
-        assert_eq!(p2.image.expect("image").url, "https://a.com/i.png");
-    }
-
-    #[test]
-    fn redirect_chain_followed() {
-        let mut fake = Fake::new();
-        fake.respond("https://a.com/", redirect_to("https://b.com/x"));
-        fake.respond("https://b.com/x", redirect_to("/final"));
-        fake.respond("https://b.com/final", html(OG));
-        let p = block_on(preview(&fake, target("https://a.com"), 1)).expect("preview");
-        assert_eq!(p.url, "https://a.com/");
-        assert_eq!(p.final_url, "https://b.com/final");
-    }
-
-    #[test]
-    fn redirect_to_blocked_target() {
-        let mut fake = Fake::new();
-        fake.respond("https://a.com/", redirect_to("http://127.0.0.1/"));
-        assert_eq!(
-            block_on(preview(&fake, target("https://a.com"), 0)),
-            Err(Error::BlockedTarget)
-        );
-    }
-
-    #[test]
-    fn https_downgrade_redirect_blocked() {
-        let mut fake = Fake::new();
-        fake.respond("https://a.com/", redirect_to("http://a.com/x"));
-        assert_eq!(
-            block_on(preview(&fake, target("https://a.com"), 0)),
-            Err(Error::BlockedTarget)
-        );
-    }
-
-    #[test]
-    fn exactly_five_redirects_succeed() {
-        let mut fake = Fake::new();
-        fake.respond("https://a.com/", redirect_to("https://b.com/1"));
-        fake.respond("https://b.com/1", redirect_to("https://b.com/2"));
-        fake.respond("https://b.com/2", redirect_to("https://b.com/3"));
-        fake.respond("https://b.com/3", redirect_to("https://b.com/4"));
-        fake.respond("https://b.com/4", redirect_to("https://b.com/final"));
-        fake.respond("https://b.com/final", html(OG));
-        let p = block_on(preview(&fake, target("https://a.com"), 9)).expect("preview");
-        assert_eq!(p.final_url, "https://b.com/final");
-    }
-
-    #[test]
-    fn json_contract() {
-        let full = Preview {
-            url: "https://a.com".into(),
-            final_url: "https://a.com/".into(),
-            title: Some("T".into()),
-            description: Some("D".into()),
-            site_name: Some("S".into()),
-            image: Some(Image {
-                url: "https://a.com/i.png".into(),
-                width: Some(1200),
-                height: Some(630),
-                alt: Some("A".into()),
-            }),
-            favicon: Some("https://a.com/f.ico".into()),
-            card: Some("summary_large_image".into()),
-            kind: Some("article".into()),
-            theme_color: Some("#fff".into()),
-            lang: Some("en".into()),
-            fetched_at: 7,
-        };
-        assert_eq!(
-            serde_json::to_string(&full).expect("ser"),
-            r##"{"url":"https://a.com","finalUrl":"https://a.com/","title":"T","description":"D","siteName":"S","image":{"url":"https://a.com/i.png","width":1200,"height":630,"alt":"A"},"favicon":"https://a.com/f.ico","card":"summary_large_image","type":"article","themeColor":"#fff","lang":"en","fetchedAt":7}"##
-        );
-        let minimal = Preview {
-            url: "https://a.com".into(),
-            final_url: "https://a.com/".into(),
-            title: Some("T".into()),
-            description: None,
-            site_name: None,
-            image: None,
-            favicon: None,
-            card: None,
-            kind: None,
-            theme_color: None,
-            lang: None,
-            fetched_at: 7,
-        };
-        assert_eq!(
-            serde_json::to_string(&minimal).expect("ser"),
-            r#"{"url":"https://a.com","finalUrl":"https://a.com/","title":"T","fetchedAt":7}"#
-        );
-    }
-
-    #[test]
-    fn twitter_image_ignores_og_dimensions() {
-        let mut fake = Fake::new();
-        fake.respond(
-            "https://a.com/",
-            html(r#"<html><head><meta name="twitter:image" content="t.png"><meta property="og:image:width" content="600"><meta property="og:title" content="x"></head><body/></html>"#),
-        );
-        let p = block_on(preview(&fake, target("https://a.com"), 0)).expect("preview");
-        let img = p.image.expect("image");
-        assert_eq!(img.url, "https://a.com/t.png");
-        assert_eq!(img.width, None);
-        assert_eq!(img.height, None);
-    }
-
-    #[test]
-    fn unresolvable_image_falls_through_to_next_key() {
-        let mut fake = Fake::new();
-        fake.respond(
-            "https://a.com/",
-            html(r#"<html><head><meta property="og:title" content="x"><meta property="og:image" content="data:image/png;base64,xx"><meta property="og:image:width" content="600"><meta name="twitter:image" content="/t.png"></head><body/></html>"#),
-        );
-        let p = block_on(preview(&fake, target("https://a.com"), 0)).expect("preview");
-        let img = p.image.expect("image");
-        assert_eq!(img.url, "https://a.com/t.png");
-        assert_eq!(img.width, None);
-        assert_eq!(img.height, None);
-    }
-
-    #[test]
-    fn zero_and_malformed_image_dimensions_dropped() {
-        let mut fake = Fake::new();
-        fake.respond(
-            "https://a.com/",
-            html(r#"<html><head><meta property="og:title" content="x"><meta property="og:image" content="i.png"><meta property="og:image:width" content="0"><meta property="og:image:height" content="big"></head><body/></html>"#),
-        );
-        let p = block_on(preview(&fake, target("https://a.com"), 0)).expect("preview");
-        let img = p.image.expect("image");
-        assert_eq!(img.width, None);
-        assert_eq!(img.height, None);
-    }
-
-    #[test]
-    fn too_many_redirects() {
-        let mut fake = Fake::new();
-        fake.respond("https://a.com/", redirect_to("https://a.com/"));
-        assert_eq!(
-            block_on(preview(&fake, target("https://a.com"), 0)),
-            Err(Error::UpstreamStatus)
-        );
-    }
-
-    #[test]
-    fn redirect_without_location() {
-        let mut fake = Fake::new();
-        fake.respond("https://a.com/", response(StatusCode::FOUND, &[], ""));
-        assert_eq!(
-            block_on(preview(&fake, target("https://a.com"), 0)),
-            Err(Error::UpstreamStatus)
-        );
-    }
-
-    #[test]
-    fn upstream_error_status() {
-        let mut fake = Fake::new();
-        fake.routes.insert(
-            "https://a.com/".into(),
-            Ok(response(StatusCode::NOT_FOUND, &[], "")),
-        );
-        assert_eq!(
-            block_on(preview(&fake, target("https://a.com"), 0)),
-            Err(Error::UpstreamStatus)
-        );
-    }
-
-    #[test]
-    fn not_html_variants() {
-        let mut fake = Fake::new();
-        fake.respond(
-            "https://a.com/",
-            response(StatusCode::OK, &[(CONTENT_TYPE.as_str(), "image/png")], "x"),
-        );
-        assert_eq!(
-            block_on(preview(&fake, target("https://a.com"), 0)),
-            Err(Error::NotHtml)
-        );
-        let mut fake2 = Fake::new();
-        fake2.respond("https://a.com/", response(StatusCode::OK, &[], "x"));
-        assert_eq!(
-            block_on(preview(&fake2, target("https://a.com"), 0)),
-            Err(Error::NotHtml)
-        );
-        // charset parameters still count as HTML
-        let mut fake3 = Fake::new();
-        fake3.respond(
-            "https://a.com/",
-            response(
-                StatusCode::OK,
-                &[(CONTENT_TYPE.as_str(), "text/html; Charset=UTF-8")],
-                "<head><title>t</title></head>",
-            ),
-        );
-        assert!(block_on(preview(&fake3, target("https://a.com"), 0)).is_ok());
-    }
-
-    #[test]
-    fn oversized_body() {
-        let mut fake = Fake::new();
-        let big = " ".repeat(MAX_HTML_BYTES + 10);
-        let doc = format!("<head><title>x</title>{big}");
-        fake.respond("https://a.com/", html(&doc));
-        assert_eq!(
-            block_on(preview(&fake, target("https://a.com"), 0)),
-            Err(Error::TooLarge)
-        );
-    }
-
-    #[test]
-    fn empty_page_is_no_metadata() {
-        let mut fake = Fake::new();
-        fake.respond("https://a.com/", html("<head></head><body>hi</body>"));
-        assert_eq!(
-            block_on(preview(&fake, target("https://a.com"), 0)),
-            Err(Error::NoMetadata)
-        );
-    }
-
-    #[test]
-    fn fetch_error_mapping() {
-        for (fe, want) in [
-            (FetchError::Blocked, Error::BlockedTarget),
-            (FetchError::Timeout, Error::UpstreamTimeout),
-            (FetchError::Unreachable, Error::UpstreamUnreachable),
-        ] {
-            let mut fake = Fake::new();
-            fake.fail("https://a.com/", fe);
-            assert_eq!(
-                block_on(preview(&fake, target("https://a.com"), 0)),
-                Err(want)
-            );
-        }
-    }
-
-    #[test]
-    fn chunked_body() {
-        let mut fake = Fake::new();
-        let mut res = http::Response::new(
-            OG.as_bytes()
-                .chunks(7)
-                .map(Bytes::copy_from_slice)
-                .collect::<Vec<_>>(),
-        );
-        *res.status_mut() = StatusCode::OK;
-        res.headers_mut()
-            .insert(CONTENT_TYPE, HeaderValue::from_static("text/html"));
-        fake.respond("https://a.com/", res);
-        let p = block_on(preview(&fake, target("https://a.com"), 0)).expect("preview");
-        assert_eq!(p.title.as_deref(), Some("OGT"));
-    }
+    }))
 }

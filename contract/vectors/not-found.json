@@ -1,0 +1,18 @@
+{
+  "description": "an unknown path is 404 not_found",
+  "request": {
+    "method": "GET",
+    "path": "/nope"
+  },
+  "expect": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    },
+    "body": {
+      "error": "not_found",
+      "message": "not found"
+    }
+  }
+}

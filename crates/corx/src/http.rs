@@ -54,6 +54,13 @@ pub fn route(method: &Method, uri: &Uri) -> Result<Route, Error> {
     Target::parse(&raw).map(Route::Preview)
 }
 
+/// The JSON error body: `{"error": slug, "message": msg}`.
+#[derive(serde::Serialize)]
+struct ErrorBody {
+    error: &'static str,
+    message: &'static str,
+}
+
 /// Serializes a preview result into the JSON response contract.
 ///
 /// `Preview` fields on success, `{"error": slug, "message": msg}` on error,
@@ -69,10 +76,10 @@ pub fn render(result: &Result<Preview, Error>) -> http::Response<Bytes> {
         ),
         Err(err) => (
             err.status(),
-            serde_json::to_vec(&serde_json::json!({
-                "error": err.slug(),
-                "message": err.message(),
-            }))
+            serde_json::to_vec(&ErrorBody {
+                error: err.slug(),
+                message: err.message(),
+            })
             .unwrap_or_else(|_| b"{}".to_vec()),
             HeaderValue::from_static(err.cache_control()),
         ),
@@ -256,51 +263,8 @@ mod tests {
     }
 
     #[test]
-    fn render_success() {
-        let p = Preview {
-            url: "https://a.com".into(),
-            final_url: "https://a.com/".into(),
-            title: Some("T".into()),
-            description: None,
-            site_name: None,
-            image: None,
-            favicon: None,
-            card: None,
-            kind: None,
-            theme_color: None,
-            lang: None,
-            fetched_at: 7,
-        };
-        let res = render(&Ok(p));
-        assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(
-            res.headers().get(CACHE_CONTROL).unwrap(),
-            "public, max-age=86400, stale-while-revalidate=604800"
-        );
-        assert_eq!(
-            res.headers().get(X_CONTENT_TYPE_OPTIONS).unwrap(),
-            "nosniff"
-        );
-        let body = serde_json::from_slice::<serde_json::Value>(res.body()).unwrap();
-        assert_eq!(
-            body.get("title").and_then(serde_json::Value::as_str),
-            Some("T")
-        );
-        assert_eq!(
-            body.get("finalUrl").and_then(serde_json::Value::as_str),
-            Some("https://a.com/")
-        );
-        assert_eq!(
-            body.get("fetchedAt").and_then(serde_json::Value::as_u64),
-            Some(7)
-        );
-        assert!(body.get("description").is_none());
-        assert!(res.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).is_none());
-    }
-
-    #[test]
     fn render_header_set() {
-        let success = Ok(Preview {
+        let success = Ok(Preview::Page(crate::Page {
             url: "https://a.com".into(),
             final_url: "https://a.com/".into(),
             title: Some("T".into()),
@@ -312,8 +276,9 @@ mod tests {
             kind: None,
             theme_color: None,
             lang: None,
+            source: crate::Source::Html,
             fetched_at: 7,
-        });
+        }));
         let errors = [
             Error::InvalidUrl,
             Error::ForbiddenOrigin,
@@ -322,7 +287,7 @@ mod tests {
             Error::NoMetadata,
             Error::MethodNotAllowed,
             Error::TooLarge,
-            Error::NotHtml,
+            Error::UnsupportedContent,
             Error::UpstreamStatus,
             Error::RateLimited,
             Error::UpstreamUnreachable,
@@ -340,27 +305,6 @@ mod tests {
             }
             assert_eq!(names, expected, "{result:?}");
         }
-    }
-
-    #[test]
-    fn render_errors() {
-        let res = render(&Err(Error::BlockedTarget));
-        assert_eq!(res.status(), StatusCode::FORBIDDEN);
-        assert_eq!(res.headers().get(CACHE_CONTROL).unwrap(), "no-store");
-        let body = serde_json::from_slice::<serde_json::Value>(res.body()).unwrap();
-        assert_eq!(
-            body.get("error").and_then(serde_json::Value::as_str),
-            Some("blocked_target")
-        );
-        assert!(
-            body.get("message")
-                .is_some_and(serde_json::Value::is_string)
-        );
-        let res2 = render(&Err(Error::NoMetadata));
-        assert_eq!(
-            res2.headers().get(CACHE_CONTROL).unwrap(),
-            "public, max-age=3600"
-        );
     }
 
     #[test]

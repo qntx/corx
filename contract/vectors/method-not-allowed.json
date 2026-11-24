@@ -1,0 +1,20 @@
+{
+  "description": "POST to the endpoint is 405 with an allow header",
+  "request": {
+    "method": "POST",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "expect": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "allow": "GET, HEAD, OPTIONS"
+    },
+    "body": {
+      "error": "method_not_allowed",
+      "message": "method not allowed"
+    }
+  }
+}

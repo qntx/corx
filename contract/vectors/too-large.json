@@ -1,0 +1,35 @@
+{
+  "description": "the body exceeding 1 MiB before </head> is 413 too_large",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body": [
+        "<html><head>",
+        {
+          "text": "x",
+          "repeat": 1048577
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "status": 413,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    },
+    "body": {
+      "error": "too_large",
+      "message": "the response exceeded the size limit"
+    }
+  }
+}

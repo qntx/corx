@@ -1,0 +1,37 @@
+{
+  "description": "<base href> rewrites relative image and icon URLs",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2Fdir%2Fpage.html"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/dir/page.html",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body": "<html><head><title>T</title><base href=\"https://cdn.example/sub/\"><meta property=\"og:image\" content=\"img.png\"><link rel=\"icon\" href=\"/f.ico\"></head><body>"
+    }
+  ],
+  "expect": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800"
+    },
+    "body": {
+      "kind": "page",
+      "url": "https://a.example/dir/page.html",
+      "finalUrl": "https://a.example/dir/page.html",
+      "source": "html",
+      "fetchedAt": 1700000000,
+      "title": "T",
+      "image": {
+        "url": "https://cdn.example/sub/img.png"
+      },
+      "favicon": "https://cdn.example/f.ico"
+    }
+  }
+}

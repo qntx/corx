@@ -1,0 +1,19 @@
+{
+  "description": "an IP-literal target is refused before any upstream fetch",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=http%3A%2F%2F127.0.0.1%2F"
+  },
+  "expect": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    },
+    "body": {
+      "error": "blocked_target",
+      "message": "the target host is not allowed"
+    }
+  }
+}

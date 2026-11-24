@@ -1,0 +1,47 @@
+{
+  "description": "a full og head yields every page field; the hop pins the upstream Accept header",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/",
+      "accept": "text/html,application/xhtml+xml",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8"
+      },
+      "body": "<html lang=\"en\"><head><meta property=\"og:title\" content=\"Example Page\"><meta property=\"og:description\" content=\"An example.\"><meta property=\"og:site_name\" content=\"Example Site\"><meta property=\"og:image\" content=\"https://cdn.example/i.png\"><meta property=\"og:image:width\" content=\"1200\"><meta property=\"og:image:height\" content=\"630\"><meta property=\"og:image:alt\" content=\"cover\"><meta property=\"og:type\" content=\"article\"><meta name=\"twitter:card\" content=\"summary_large_image\"><meta name=\"theme-color\" content=\"#fff000\"><link rel=\"icon\" href=\"/favicon.ico\"></head><body>x"
+    }
+  ],
+  "expect": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800"
+    },
+    "body": {
+      "kind": "page",
+      "url": "https://a.example/",
+      "finalUrl": "https://a.example/",
+      "source": "html",
+      "fetchedAt": 1700000000,
+      "title": "Example Page",
+      "description": "An example.",
+      "siteName": "Example Site",
+      "image": {
+        "url": "https://cdn.example/i.png",
+        "width": 1200,
+        "height": 630,
+        "alt": "cover"
+      },
+      "favicon": "https://a.example/favicon.ico",
+      "card": "summary_large_image",
+      "type": "article",
+      "themeColor": "#fff000",
+      "lang": "en"
+    }
+  }
+}

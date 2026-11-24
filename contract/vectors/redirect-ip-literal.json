@@ -1,0 +1,28 @@
+{
+  "description": "a redirect to an IP literal is 403 blocked_target",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=http%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "http://a.example/",
+      "status": 302,
+      "headers": {
+        "location": "http://127.0.0.1/"
+      }
+    }
+  ],
+  "expect": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    },
+    "body": {
+      "error": "blocked_target",
+      "message": "the target host is not allowed"
+    }
+  }
+}

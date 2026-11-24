@@ -32,3 +32,4 @@ mime.workspace         = true
 
 [dev-dependencies]
 futures-executor = "0.3"
+jsonschema       = { version = "0.61.2", default-features = false }

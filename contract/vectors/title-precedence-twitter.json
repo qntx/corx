@@ -1,0 +1,33 @@
+{
+  "description": "twitter:title beats <title>",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body": "<html><head><title>Element</title><meta name=\"twitter:title\" content=\"Twitter\"></head><body>"
+    }
+  ],
+  "expect": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800"
+    },
+    "body": {
+      "kind": "page",
+      "url": "https://a.example/",
+      "finalUrl": "https://a.example/",
+      "source": "html",
+      "fetchedAt": 1700000000,
+      "title": "Twitter"
+    }
+  }
+}

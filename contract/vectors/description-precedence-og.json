@@ -1,0 +1,34 @@
+{
+  "description": "og:description beats twitter:description and description",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body": "<html><head><title>T</title><meta property=\"og:description\" content=\"OG\"><meta name=\"twitter:description\" content=\"TW\"><meta name=\"description\" content=\"Plain\"></head><body>"
+    }
+  ],
+  "expect": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800"
+    },
+    "body": {
+      "kind": "page",
+      "url": "https://a.example/",
+      "finalUrl": "https://a.example/",
+      "source": "html",
+      "fetchedAt": 1700000000,
+      "title": "T",
+      "description": "OG"
+    }
+  }
+}

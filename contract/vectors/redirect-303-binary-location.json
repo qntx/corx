@@ -1,0 +1,52 @@
+{
+  "description": "a 303 whose Content-Type is binary still follows Location, and the extractor streams ~850 KB of head",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ"
+  },
+  "upstream": [
+    {
+      "url": "https://youtu.be/dQw4w9WgXcQ",
+      "status": 303,
+      "headers": {
+        "content-type": "application/binary",
+        "location": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=youtu.be"
+      }
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=youtu.be",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8"
+      },
+      "body": [
+        "<html lang=\"en\"><head><meta property=\"og:title\" content=\"Rick Astley - Never Gonna Give You Up\">",
+        {
+          "text": "<script>var x=1;</script>",
+          "repeat": 34000
+        },
+        "<meta property=\"og:image\" content=\"https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg\"></head><body>"
+      ]
+    }
+  ],
+  "expect": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800"
+    },
+    "body": {
+      "kind": "page",
+      "url": "https://youtu.be/dQw4w9WgXcQ",
+      "finalUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=youtu.be",
+      "source": "html",
+      "fetchedAt": 1700000000,
+      "title": "Rick Astley - Never Gonna Give You Up",
+      "image": {
+        "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"
+      },
+      "lang": "en"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "description": "a non-HTML hop yields a media preview with its Content-Length",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fcdn.example%2Fcover.png"
+  },
+  "upstream": [
+    {
+      "url": "https://cdn.example/cover.png",
+      "status": 200,
+      "headers": {
+        "content-type": "image/png",
+        "content-length": "4096"
+      }
+    }
+  ],
+  "expect": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800"
+    },
+    "body": {
+      "kind": "media",
+      "url": "https://cdn.example/cover.png",
+      "finalUrl": "https://cdn.example/cover.png",
+      "mediaType": "image/png",
+      "fetchedAt": 1700000000,
+      "size": 4096
+    }
+  }
+}

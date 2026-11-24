@@ -1,0 +1,63 @@
+{
+  "description": "a sixth redirect is 422 upstream_status",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/",
+      "status": 302,
+      "headers": {
+        "location": "/r1"
+      }
+    },
+    {
+      "url": "https://a.example/r1",
+      "status": 302,
+      "headers": {
+        "location": "/r2"
+      }
+    },
+    {
+      "url": "https://a.example/r2",
+      "status": 302,
+      "headers": {
+        "location": "/r3"
+      }
+    },
+    {
+      "url": "https://a.example/r3",
+      "status": 302,
+      "headers": {
+        "location": "/r4"
+      }
+    },
+    {
+      "url": "https://a.example/r4",
+      "status": 302,
+      "headers": {
+        "location": "/r5"
+      }
+    },
+    {
+      "url": "https://a.example/r5",
+      "status": 302,
+      "headers": {
+        "location": "/r6"
+      }
+    }
+  ],
+  "expect": {
+    "status": 422,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=3600"
+    },
+    "body": {
+      "error": "upstream_status",
+      "message": "the upstream server returned an unexpected status"
+    }
+  }
+}

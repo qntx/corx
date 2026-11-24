@@ -1,0 +1,34 @@
+{
+  "description": "entities decode and whitespace collapses in text fields",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body": "<html><head><title>Caf&eacute;  &amp;   Bar</title><meta property=\"og:description\" content=\"Tom &amp; Jerry\"></head><body>"
+    }
+  ],
+  "expect": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800"
+    },
+    "body": {
+      "kind": "page",
+      "url": "https://a.example/",
+      "finalUrl": "https://a.example/",
+      "source": "html",
+      "fetchedAt": 1700000000,
+      "title": "Caf\u00e9 & Bar",
+      "description": "Tom & Jerry"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "OPTIONS preflight is a 204 with an empty body",
+  "request": {
+    "method": "OPTIONS",
+    "path": "/v1/preview",
+    "origin": "https://app.example"
+  },
+  "expect": {
+    "status": 204
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "description": "without a Content-Type charset, <meta charset> decodes the body",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fa.example%2F"
+  },
+  "upstream": [
+    {
+      "url": "https://a.example/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body": [
+        {
+          "bytes": [
+            60,
+            104,
+            101,
+            97,
+            100,
+            62,
+            60,
+            109,
+            101,
+            116,
+            97,
+            32,
+            99,
+            104,
+            97,
+            114,
+            115,
+            101,
+            116,
+            61,
+            34,
+            119,
+            105,
+            110,
+            100,
+            111,
+            119,
+            115,
+            45,
+            49,
+            50,
+            53,
+            50,
+            34,
+            62,
+            60,
+            116,
+            105,
+            116,
+            108,
+            101,
+            62,
+            99,
+            97,
+            102,
+            233,
+            60,
+            47,
+            116,
+            105,
+            116,
+            108,
+            101,
+            62,
+            60,
+            47,
+            104,
+            101,
+            97,
+            100,
+            62
+          ]
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800"
+    },
+    "body": {
+      "kind": "page",
+      "url": "https://a.example/",
+      "finalUrl": "https://a.example/",
+      "source": "html",
+      "fetchedAt": 1700000000,
+      "title": "caf\u00e9"
+    }
+  }
+}
