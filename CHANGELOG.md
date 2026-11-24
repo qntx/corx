@@ -46,6 +46,9 @@ the HTTP contract of the preview endpoint.
 - Diagnostic response header `corx-cache: hit|miss`, stamped after the
   cache lookup and never stored; it is absent on responses produced
   before the lookup and is not part of the versioned contract.
+- `corx-corpus` records the `corx-cache` verdict per URL and prints
+  hit/miss/absent totals; `ua-sweep.sh` aborts a sweep whose run was
+  served from cache.
 
 ### Fixed
 

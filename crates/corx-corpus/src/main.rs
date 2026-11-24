@@ -263,6 +263,9 @@ struct Record {
     /// `upstreamStatus` when present.
     #[serde(skip_serializing_if = "Option::is_none")]
     upstream_status: Option<u16>,
+    /// `corx-cache` verdict (`hit`/`miss`) when the service stamped it;
+    /// `null` when absent.
+    cache: Option<String>,
     /// `error` slug when present.
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
@@ -325,6 +328,7 @@ async fn fetch_one(client: &reqwest::Client, base: &str, entry: &Entry) -> Recor
         fields: None,
         media_type: None,
         upstream_status: None,
+        cache: None,
         error: None,
         title: None,
         latency_ms,
@@ -343,6 +347,11 @@ async fn fetch_one(client: &reqwest::Client, base: &str, entry: &Entry) -> Recor
         }
         Ok(r) => {
             rec.status = Some(r.status().as_u16());
+            rec.cache = r
+                .headers()
+                .get("corx-cache")
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_owned);
             match r.text().await {
                 Err(_) => "transport:decode".clone_into(&mut rec.outcome),
                 Ok(text) => match serde_json::from_str::<Value>(&text) {
@@ -427,10 +436,11 @@ fn line(r: &Record) -> String {
     let us = r
         .upstream_status
         .map_or_else(|| "-".to_owned(), |v| v.to_string());
+    let cache = r.cache.clone().unwrap_or_else(|| "-".to_owned());
     let title = r.title.clone().unwrap_or_else(|| "-".to_owned());
     let secs = r.latency_ms as f64 / 1000.0;
     format!(
-        "{verdict:<4}  {status:>3}  {secs:>6.2}s  {outcome:<20}  {detail:<5}  {src:<7}  {us:>3}  {title:<60}  {url}",
+        "{verdict:<4}  {status:>3}  {secs:>6.2}s  {outcome:<20}  {detail:<5}  {src:<7}  {us:>3}  {cache:<4}  {title:<60}  {url}",
         outcome = r.outcome,
         url = r.url,
     )
@@ -443,6 +453,20 @@ fn outcome_counts(records: &[Record]) -> BTreeMap<String, usize> {
         *outcomes.entry(r.outcome.clone()).or_default() += 1;
     }
     outcomes
+}
+
+/// `corx-cache` verdicts over the records: hits, misses, and records
+/// where the header was absent (or carried an unexpected value).
+fn cache_counts(records: &[Record]) -> (usize, usize, usize) {
+    let mut counts = (0, 0, 0);
+    for r in records {
+        match r.cache.as_deref() {
+            Some("hit") => counts.0 += 1,
+            Some("miss") => counts.1 += 1,
+            _ => counts.2 += 1,
+        }
+    }
+    counts
 }
 
 /// Prints the per-URL table, totals, and writes `--json` when requested.
@@ -473,6 +497,8 @@ fn finish_run(records: &[Record], base: &str, started_at: u64, json: Option<&Pat
         "latency ms: all p50={} p95={} max={} | pass p50={} p95={} max={}",
         all.p50, all.p95, all.max, ok.p50, ok.p95, ok.max
     );
+    let (hit, miss, absent) = cache_counts(records);
+    println!("corx-cache: {hit} hit, {miss} miss, {absent} absent");
     if let Some(path) = json {
         let doc = serde_json::json!({
             "base": base,
@@ -483,6 +509,7 @@ fn finish_run(records: &[Record], base: &str, started_at: u64, json: Option<&Pat
                 "pass": pass,
                 "fail": records.len() - pass,
                 "outcomes": outcomes,
+                "cache": { "hit": hit, "miss": miss, "absent": absent },
                 "latencyMs": all,
             },
         });
@@ -929,6 +956,7 @@ mod tests {
             fields: fields.map(str::to_owned),
             media_type: None,
             upstream_status: None,
+            cache: None,
             error: None,
             title: None,
             latency_ms: 1,
@@ -1016,6 +1044,26 @@ mod tests {
         });
         // description is null → '-'; the rest present.
         assert_eq!(fields_mask(&body), "T-SIF", "mask order TDSIF");
+    }
+
+    #[test]
+    fn cache_verdicts_tally() {
+        let hit = Record {
+            cache: Some("hit".to_owned()),
+            ..rec(None, None, None)
+        };
+        let miss = Record {
+            cache: Some("miss".to_owned()),
+            ..rec(None, None, None)
+        };
+        let stale = rec(None, None, None); // no stamp: predates the header
+        let weird = Record {
+            cache: Some("bogus".to_owned()),
+            ..rec(None, None, None)
+        };
+        let recs = [hit, miss.clone(), miss, stale, weird];
+        assert_eq!(cache_counts(&recs), (1, 2, 2));
+        assert_eq!(cache_counts(&[]), (0, 0, 0));
     }
 
     #[test]

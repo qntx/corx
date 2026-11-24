@@ -98,6 +98,28 @@ for ua in "$@"; do
     "$corpus" run "http://127.0.0.1:$port" \
         ${list:+--list "$list"} \
         --json "$out/$i.json" | tee "$out/$i.txt"
+    # A `corx-cache: hit` means the result was replayed from the cache,
+    # not measured under this UA — e.g. the same UA swept again inside
+    # the cache TTL (--remote shares the edge cache between runs).
+    hits="$(python3 - "$out/$i.json" <<'PY'
+import json, sys
+doc = json.load(open(sys.argv[1]))
+print("\n".join(r["url"] for r in doc["records"] if r.get("cache") == "hit"))
+PY
+)"
+    if [ -n "$hits" ]; then
+        {
+            echo "================================================================"
+            echo "ERROR: run $i for UA \"$ua\" was served from cache:"
+            echo "$hits" | sed 's/^/  hit: /'
+            echo "These results are NOT measurements of this UA — the same UA was"
+            echo "likely swept again within the cache TTL (on --remote the edge"
+            echo "cache persists between wrangler runs). Wipe the cache or wait"
+            echo "out the TTL, then re-run."
+            echo "================================================================"
+        } >&2
+        exit 1
+    fi
     cleanup
 done
 set +m
