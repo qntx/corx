@@ -1,0 +1,50 @@
+{
+  "description": "a youtu.be redirect to a 429 watch page asks oEmbed for the watch URL",
+  "request": {
+    "method": "GET",
+    "path": "/v1/preview",
+    "query": "url=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ"
+  },
+  "upstream": [
+    {
+      "url": "https://youtu.be/dQw4w9WgXcQ",
+      "status": 303,
+      "headers": {
+        "content-type": "application/binary",
+        "location": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=youtu.be"
+      }
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=youtu.be",
+      "status": 429
+    },
+    {
+      "url": "https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ%26feature%3Dyoutu.be&format=json",
+      "accept": "application/json",
+      "status": 200,
+      "body": "{\"type\":\"video\",\"version\":\"1.0\",\"title\":\"Rick Astley - Never Gonna Give You Up (Official Music Video)\",\"author_name\":\"Rick Astley\",\"provider_name\":\"YouTube\",\"thumbnail_url\":\"https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg\",\"thumbnail_width\":480,\"thumbnail_height\":360,\"html\":\"<iframe/>\"}"
+    }
+  ],
+  "expect": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800"
+    },
+    "body": {
+      "kind": "page",
+      "url": "https://youtu.be/dQw4w9WgXcQ",
+      "finalUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=youtu.be",
+      "fetchedAt": 1700000000,
+      "source": "oembed",
+      "title": "Rick Astley - Never Gonna Give You Up (Official Music Video)",
+      "description": "Rick Astley",
+      "siteName": "YouTube",
+      "image": {
+        "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+        "width": 480,
+        "height": 360
+      }
+    }
+  }
+}

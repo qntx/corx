@@ -36,6 +36,21 @@ const PROVIDERS: &[Provider] = &[
         host: "tiktok.com",
         endpoint: "https://www.tiktok.com/oembed",
     },
+    // youtube: youtu.be links redirect here, and this hop can be the one
+    // that answers 429 or a poor page; the keyless oEmbed still returns
+    // title, author and thumbnail (2026-11-24, Cloudflare egress via
+    // `wrangler dev --remote`).
+    Provider {
+        host: "youtube.com",
+        endpoint: "https://www.youtube.com/oembed",
+    },
+    // youtu.be: the short link answers an honest UA with 429 (same
+    // 2026-11-24 measurement: https://youtu.be/dQw4w9WgXcQ → 422
+    // upstream_status, upstreamStatus 429); the oEmbed is YouTube's.
+    Provider {
+        host: "youtu.be",
+        endpoint: "https://www.youtube.com/oembed",
+    },
 ];
 
 /// The provider for `target`'s host — exact or any subdomain.
@@ -173,10 +188,12 @@ fn map(res: &Response, base: &Url) -> Page {
     }
 }
 
-/// The oEmbed fallback: runs when the final HTML hop's host has a provider
-/// and the HTML result is an [`Error::UpstreamStatus`], an
-/// [`Error::NoMetadata`], or a page with neither description nor image.
-/// Returns the oEmbed page on success, the original result on any failure.
+/// The oEmbed fallback: `hop` is the hop whose response produced `html`
+/// — the one that answered non-2xx or served the poor page — so both the
+/// provider lookup and the oEmbed `url` parameter describe it. Runs when
+/// `html` is an [`Error::UpstreamStatus`], an [`Error::NoMetadata`], or a
+/// page with neither description nor image. Returns the oEmbed page on
+/// success, the original result on any failure.
 #[allow(
     clippy::future_not_send,
     reason = "Send-ness is arch-conditional via MaybeSend/MaybeSync; wasm futures are intentionally !Send"
@@ -184,24 +201,24 @@ fn map(res: &Response, base: &Url) -> Page {
 pub(crate) async fn fallback<F: Fetch>(
     fetch: &F,
     original: &str,
-    final_hop: &Target,
+    hop: &Target,
     now_unix_secs: u64,
     html: Result<Preview, Error>,
     trace: &mut Trace,
 ) -> Result<Preview, Error> {
-    let Some(provider) = provider_for(final_hop) else {
+    let Some(provider) = provider_for(hop) else {
         return html;
     };
     if !fallback_worthy(&html) {
         return html;
     }
-    let Some(target) = request_url(provider, final_hop.as_str()) else {
+    let Some(target) = request_url(provider, hop.as_str()) else {
         return html;
     };
     match exchange(fetch, &target, trace).await {
         Some(mut page) if page.title.is_some() || page.image.is_some() => {
             original.clone_into(&mut page.url);
-            final_hop.as_str().clone_into(&mut page.final_url);
+            hop.as_str().clone_into(&mut page.final_url);
             page.fetched_at = now_unix_secs;
             Ok(Preview::Page(page))
         }

@@ -35,8 +35,8 @@ the HTTP contract of the preview endpoint.
   vectors validating the HTTP shape (#61).
 - Per-request diagnostics: `upstream_status`, `hops` and `oembed_status`
   on the `Record`/structured logs of both adapters (#62, #63).
-- oEmbed fallback for reddit.com and tiktok.com when HTML extraction
-  fails or yields too little (#63).
+- oEmbed fallback for reddit.com, tiktok.com and youtube.com/youtu.be
+  when HTML extraction fails or yields too little (#63).
 - Black-box conformance suite `corx-conformance` running the same cases
   against both editions, wired into CI (#60).
 - `corx-corpus`: corpus runner/compare tool, the URL corpus,

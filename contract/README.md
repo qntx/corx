@@ -77,8 +77,9 @@ must yield a `title` or an `image`; anything less is
 `source` is `"html"` when the metadata was extracted from the target's
 own HTML head. `"oembed"` marks a preview resolved through a provider's
 oEmbed endpoint: when the final HTML hop's host has a registered oEmbed
-provider — currently `reddit.com` and `tiktok.com`, including their
-subdomains — and the HTML outcome is an `upstream_status` error, a
+provider — currently `reddit.com`, `tiktok.com`, `youtube.com` and
+`youtu.be`, including their subdomains — and the HTML outcome is an
+`upstream_status` error, a
 `no_metadata` error, or a page with neither `description` nor `image`,
 the service makes exactly one `GET` to the provider's oEmbed endpoint
 (`<endpoint>?url=<finalUrl>&format=json`). That request sends
