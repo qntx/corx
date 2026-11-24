@@ -1,0 +1,20 @@
+[package]
+name                   = "corx-corpus"
+description            = "Run the URL corpus against a corx deployment and diff two runs"
+publish                = false
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+authors.workspace      = true
+
+[dependencies]
+clap.workspace       = true
+reqwest              = { workspace = true, features = ["query"] }
+serde.workspace      = true
+serde_json.workspace = true
+tokio.workspace      = true
+
+[lints]
+workspace = true

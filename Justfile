@@ -35,6 +35,14 @@ test:
 conformance edition:
     crates/corx-conformance/run.sh {{ edition }}
 
+# Run the URL corpus against a deployment (e.g. `just corpus http://127.0.0.1:8787`).
+corpus base-url:
+    cargo run --release -p corx-corpus -- run {{ base-url }}
+
+# Sweep upstream User-Agents through the Worker (see corpus/ua-sweep.sh).
+corpus-ua *uas:
+    corpus/ua-sweep.sh {{ uas }}
+
 # Run the Worker locally (installs wrangler + worker-build via npm/cargo).
 worker-dev:
     cd crates/corx-worker && npx wrangler@4.149.0 dev --var ALLOWED_ORIGINS:http://localhost:5173

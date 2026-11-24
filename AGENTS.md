@@ -33,4 +33,10 @@ crates/corx-conformance/run.sh worker
 
 `docs/` is local-only and gitignored; never commit it.
 
+Run the URL corpus against a deployment (reports only, never gates):
+
+```bash
+just corpus <base-url>
+```
+
 TOML is formatted by taplo (`.taplo.toml`, aligned `=`); keep `taplo fmt --check` green.

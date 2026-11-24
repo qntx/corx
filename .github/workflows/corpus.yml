@@ -1,0 +1,62 @@
+# Advisory corpus run — weekly and on demand, never on push/PR. It
+# reports; it does not gate. Results land in the step summary and as an
+# artifact (corpus-<run_id>).
+name: corpus
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      server-ref:
+        description: "git ref of the server to build (empty = this commit)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      SERVER_REF: ${{ inputs.server-ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: ${{ inputs.server-ref && 0 || 1 }}
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: build corx-corpus
+        run: cargo build --release -p corx-corpus
+      - name: build the server
+        run: |
+          if [ -n "$SERVER_REF" ]; then
+              git worktree add /tmp/corx-server-ref "$SERVER_REF"
+              cargo build --release --manifest-path /tmp/corx-server-ref/Cargo.toml -p corx-server
+              echo "SERVER=/tmp/corx-server-ref/target/release/corx" >> "$GITHUB_ENV"
+          else
+              cargo build --release -p corx-server
+              echo "SERVER=$PWD/target/release/corx" >> "$GITHUB_ENV"
+          fi
+      - name: run the corpus
+        run: |
+          "$SERVER" --bind 127.0.0.1:8080 --allowed-origins '*' &
+          server_pid=$!
+          trap 'kill $server_pid 2>/dev/null || true' EXIT
+          for _ in $(seq 1 120); do
+              curl -s -o /dev/null http://127.0.0.1:8080/healthz && break
+              sleep 0.5
+          done
+          ./target/release/corx-corpus run http://127.0.0.1:8080 \
+              --json corpus.json | tee corpus.txt
+          cat corpus.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: corpus-${{ github.run_id }}
+          path: |
+            corpus.json
+            corpus.txt

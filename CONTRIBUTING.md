@@ -22,9 +22,11 @@ Thanks for taking the time to improve corx.
 ```text
 crates/corx/              sans-IO core (publishable; builds native + wasm32)
 crates/corx-conformance/  black-box conformance suite for both editions
+crates/corx-corpus/       the `corx-corpus` tool (corpus run/compare)
 crates/corx-server/       the `corx` binary: axum + reqwest + governor + moka
 crates/corx-worker/       Cloudflare Worker adapter (workers-rs, cdylib) and wrangler.jsonc
 contract/                 the HTTP contract: prose, JSON schema, golden vectors
+corpus/                   the URL corpus list + the UA-sweep script
 Dockerfile                multi-stage cargo-chef image (distroless runtime)
 .github/                  CI, release, docker and dependabot workflows
 ```
@@ -133,6 +135,15 @@ with `198.18.0.0/15` addresses, which corx correctly rejects as reserved.
   `corx`, `run.sh worker` serves `crates/corx-worker` under
   `wrangler dev --local`. Each case asserts the exact response header set —
   no case needs the public web.
+- The corpus tool (`just corpus <base-url>`) runs `corpus/urls.txt` against
+  a live deployment and scores each URL against its expectation — it
+  reports, never gates (the web changes). `corpus/ua-sweep.sh` does the
+  same per upstream `USER_AGENT` to pick a deployment UA. The weekly
+  advisory workflow (`corpus.yml`, plus `workflow_dispatch`) runs it on CI;
+  on Macs whose resolver answers 198.18.0.0/15 (fake-IP proxies) the
+  native server rejects every target — run `wrangler dev --local` and point
+  the tool at the Worker for Worker-code numbers (measuring this machine's
+  egress, not Cloudflare's), or use the workflow for native numbers.
 
 ## Dependencies
 

@@ -520,6 +520,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "corx-corpus"
+version = "0.3.0"
+dependencies = [
+ "clap",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "corx-server"
 version = "0.3.0"
 dependencies = [
@@ -2227,6 +2238,8 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_urlencoded",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",

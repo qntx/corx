@@ -1,0 +1,80 @@
+# corx corpus: one URL per line, then a minimum expectation.
+#
+#   any                    informational, no expectation (bot walls, volatile pages)
+#   page                   any page result
+#   page:T+I               a page with the listed fields (T title, D description,
+#                          S siteName, I image, F favicon)
+#   page/oembed:T          a page produced by the oEmbed fallback
+#   media                  any media result
+#   media:image/*          a media result whose mediaType matches (exact or type/*)
+#   error:<slug>           exactly this error slug
+#
+# The web changes: expectations are minimums observed to hold, not promises.
+
+# seed (baseline-v0.3.0-worker.txt)
+https://www.youtube.com/watch?v=dQw4w9WgXcQ                                         page:T+I
+https://youtu.be/dQw4w9WgXcQ                                                        page:T+I
+https://x.com/jack/status/20                                                        page:T
+https://twitter.com/jack/status/20                                                  page:T
+https://github.com/qntx/corx                                                         page:T+I
+https://github.com/rust-lang/rust/pull/100000                                       page:T+I
+https://www.nytimes.com/                                                            any
+https://www.bbc.com/news                                                            page:T
+https://medium.com/@ev/welcome-to-medium-9e53ca408c48                               any
+https://en.wikipedia.org/wiki/Nostr                                                 page:T
+https://www.reddit.com/r/nostr/                                                     any
+https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT                               page:T+I
+https://soundcloud.com/forss/flickermood                                            page:T+I
+https://www.twitch.tv/twitch                                                        page:T+I
+https://www.instagram.com/instagram/                                                any
+https://www.tiktok.com/@tiktok                                                      page:T
+https://www.amazon.com/dp/B08N5WRWNW                                                any
+https://arxiv.org/abs/1706.03762                                                    page:T+D
+https://njump.me/npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m   page:T
+https://primal.net/jack                                                             page:T
+https://stacker.news/                                                               any
+https://mempool.space/                                                              page:T
+https://www.bloomberg.com/                                                          any
+https://music.apple.com/us/album/abbey-road-remastered/1441164426                   page:T+I
+https://t.me/durov                                                                  page:T+I
+https://bsky.app/profile/bsky.app                                                   page:T+I
+https://mastodon.social/@Gargron                                                    page:T+I
+https://www.npmjs.com/package/react                                                 any
+https://docs.rs/tokio                                                               page:T
+https://crates.io/crates/serde                                                      page:T
+https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png  media:image/png
+https://arxiv.org/pdf/1706.03762                                                    media:application/pdf
+https://www.bilibili.com/video/BV1GJ411x7h7                                         any
+https://mp.weixin.qq.com/s/1                                                        any
+https://www.zhihu.com/question/19550225                                             any
+https://vimeo.com/76979871                                                          page:T+I
+https://substack.com/                                                               any
+https://www.theguardian.com/international                                           page:T
+https://news.ycombinator.com/item?id=1                                              page:T
+https://bitcoinmagazine.com/                                                        page:T+I
+https://www.coindesk.com/                                                           any
+https://polymarket.com/                                                             page:T+I
+https://app.hyperliquid.xyz/trade/BTC                                               page:T
+https://zap.stream/                                                                 page:T+I
+https://habla.news/                                                                 any
+https://yakihonne.com/                                                              page:T
+https://www.linkedin.com/company/microsoft                                          any
+https://www.facebook.com/facebook                                                   any
+https://discord.com/invite/rust-lang                                                page:T+I
+https://docs.google.com/document/d/1                                                any
+https://www.threads.net/@zuck                                                       page:T+I
+https://store.steampowered.com/app/730                                              page:T+I
+https://apps.apple.com/us/app/damus/id1628663131                                    page:T+I
+https://play.google.com/store/apps/details?id=com.vitorpamplona.amethyst            page:T+I
+https://example.com/                                                                page:T
+https://httpbin.org/redirect/3                                                      media:application/json
+https://bit.ly/3xyz                                                                 any
+https://www.washingtonpost.com/                                                     any
+https://techcrunch.com/                                                             page:T+I
+https://www.wsj.com/                                                                any
+
+# added for corx 0.4
+# a Reddit post: the HTML is a bot wall titled "Reddit"; Reddit's keyless oEmbed has the post title
+https://www.reddit.com/r/evolutionReddit/comments/1abcde/facebook_backs_away_quietly_from_its_cispa_support/  page/oembed:T
+# a JPEG served as a direct file
+https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg                     media:image/jpeg
