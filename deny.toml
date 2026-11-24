@@ -13,8 +13,27 @@ all-features = true
 [advisories]
 db-path = "$CARGO_HOME/advisory-dbs"
 db-urls = ["https://github.com/RustSec/advisory-db"]
-yanked  = "deny"
-ignore  = []
+yanked = "deny"
+ignore = [
+  # chrono is unmaintained and has no patched release. It is only in the
+  # wasm32 Worker graph, as a non-optional dependency of `worker` 0.9.0;
+  # corx calls none of its API (`worker::Date::now` and `Delay`, the only
+  # time APIs corx-worker uses, go through js-sys, not chrono).
+  # Revisit: remove this entry when `worker` drops chrono.
+  { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained; wasm32 Worker graph only, via `worker`; corx uses none of its API; remove when `worker` drops chrono" },
+  # url <= 2.5.8: `Url::origin()` recurses once per nested `blob:` prefix
+  # and can overflow the stack. Across the workspace and all 350 registry
+  # crates in Cargo.lock, the only caller of `Url::origin()` (nothing calls
+  # `url::quirks::origin()`) is corx-worker's `request_uri_and_origin`, on
+  # the Worker's own incoming request URL, whose scheme is always http(s)
+  # (set by workerd, not the client); the recursion needs a `blob:` URL.
+  # User targets never reach `origin()` (`Target::parse` admits only
+  # http(s), and nothing calls it on them).
+  # Fixed in 2.5.9, published 2026-11-20T23:03Z.
+  # Revisit: from 2026-11-28 (7-day rule) run `cargo update -p url` to
+  # 2.5.9 and remove this entry.
+  { id = "RUSTSEC-2026-0592", reason = "Url::origin() blob: recursion; only called on the Worker's own http(s) request URL, never on user input; bump url to 2.5.9 and remove from 2026-11-28" },
+]
 
 [licenses]
 unused-allowed-license = "warn"
