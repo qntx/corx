@@ -109,6 +109,10 @@ struct Response {
 /// [`MAX_OEMBED_BYTES`], parseable as JSON, yielding a page that satisfies
 /// the title-or-image rule. Any failure returns `None` and the caller
 /// keeps the original HTML result.
+#[allow(
+    clippy::future_not_send,
+    reason = "Send-ness is arch-conditional via MaybeSend/MaybeSync; wasm futures are intentionally !Send"
+)]
 async fn exchange<F: Fetch>(fetch: &F, target: &Target, trace: &mut Trace) -> Option<Page> {
     let res = fetch.get(target.as_url(), ACCEPT_JSON).await.ok()?;
     trace.oembed_status = Some(res.status());
@@ -173,6 +177,10 @@ fn map(res: &Response, base: &Url) -> Page {
 /// and the HTML result is an [`Error::UpstreamStatus`], an
 /// [`Error::NoMetadata`], or a page with neither description nor image.
 /// Returns the oEmbed page on success, the original result on any failure.
+#[allow(
+    clippy::future_not_send,
+    reason = "Send-ness is arch-conditional via MaybeSend/MaybeSync; wasm futures are intentionally !Send"
+)]
 pub(crate) async fn fallback<F: Fetch>(
     fetch: &F,
     original: &str,
